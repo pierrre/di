@@ -11,29 +11,29 @@ func Example() {
 	// New container.
 	c := new(Container)
 	// Set ServiceA.
-	Set(c, "", func(c *Container) (*ServiceA, Close, error) {
-		return &ServiceA{}, nil, nil
+	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+		return &serviceA{}, nil, nil
 	})
 	// Set ServiceB.
 	somethingWrong := false
-	Set(c, "", func(c *Container) (*ServiceB, Close, error) {
+	Set(c, "", func(c *Container) (*serviceB, Close, error) {
 		// We know that ServiceA's builder doesn't return an error, so we ignore it.
-		sa := Must(Get[*ServiceA](c, ""))
+		sa := Must(Get[*serviceA](c, ""))
 		if somethingWrong {
 			return nil, nil, fmt.Errorf("error")
 		}
-		sb := &ServiceB{
+		sb := &serviceB{
 			sa.DoA,
 		}
 		return sb, sb.close, nil
 	})
 	// Set ServiceC.
-	Set(c, "", func(c *Container) (*ServiceC, Close, error) {
-		sb, err := Get[*ServiceB](c, "")
+	Set(c, "", func(c *Container) (*serviceC, Close, error) {
+		sb, err := Get[*serviceB](c, "")
 		if err != nil {
 			return nil, nil, err
 		}
-		sc := &ServiceC{
+		sc := &serviceC{
 			sb.DoB,
 		}
 		// The ServiceC close function doesn't return an error, so we wrap it.
@@ -44,7 +44,7 @@ func Example() {
 		return sc, cl, nil
 	})
 	// Get ServiceC and call it.
-	sc, err := Get[*ServiceC](c, "")
+	sc, err := Get[*serviceC](c, "")
 	if err != nil {
 		panic(err)
 	}
@@ -61,36 +61,36 @@ func Example() {
 	// close C
 }
 
-type ServiceA struct{}
+type serviceA struct{}
 
-func (sa *ServiceA) DoA() {
+func (sa *serviceA) DoA() {
 	fmt.Println("do A")
 }
 
-type ServiceB struct {
+type serviceB struct {
 	sa func()
 }
 
-func (sb *ServiceB) DoB() {
+func (sb *serviceB) DoB() {
 	sb.sa()
 	fmt.Println("do B")
 }
 
-func (sb *ServiceB) close() error {
+func (sb *serviceB) close() error {
 	fmt.Println("close B")
 	return nil
 }
 
-type ServiceC struct {
+type serviceC struct {
 	sb func()
 }
 
-func (sc *ServiceC) DoC() {
+func (sc *serviceC) DoC() {
 	sc.sb()
 	fmt.Println("do C")
 }
 
-func (sc *ServiceC) close() {
+func (sc *serviceC) close() {
 	fmt.Println("close C")
 }
 
