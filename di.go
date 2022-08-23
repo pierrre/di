@@ -148,7 +148,8 @@ func (sw *serviceWrapperImpl[S]) close() error {
 	}
 	err := sw.cl()
 	sw.initialized = false
-	sw.service = zero[S]()
+	var zero S
+	sw.service = zero
 	sw.cl = nil
 	return err
 }
@@ -170,9 +171,4 @@ func getServiceName[S any]() string {
 	v := fmt.Sprintf("%T", &s)
 	v = v[1:] // Remove the leading "*".
 	return v
-}
-
-func zero[S any]() S {
-	var s S
-	return s
 }
