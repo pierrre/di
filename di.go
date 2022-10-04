@@ -164,7 +164,7 @@ func Must[T any](v T, err error) T {
 
 func getServiceName[S any]() string {
 	var s S
-	if interface{}(s) != nil {
+	if any(s) != nil {
 		return fmt.Sprintf("%T", s)
 	}
 	// For interface types, we need to get a pointer.
