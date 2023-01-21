@@ -3,6 +3,7 @@ package di
 
 import (
 	"fmt"
+	"reflect" //nolint:depguard // Used for service name.
 	"sync"
 )
 
@@ -164,11 +165,6 @@ func Must[T any](v T, err error) T {
 
 func getServiceName[S any]() string {
 	var s S
-	if any(s) != nil {
-		return fmt.Sprintf("%T", s)
-	}
-	// For interface types, we need to get a pointer.
-	v := fmt.Sprintf("%T", &s)
-	v = v[1:] // Remove the leading "*".
-	return v
+	// Use pointer in order to work with interface types.
+	return reflect.TypeOf(&s).Elem().String()
 }
