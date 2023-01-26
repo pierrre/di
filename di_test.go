@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"testing"
+
+	"github.com/pierrre/assert"
 )
 
 func Test(t *testing.T) {
@@ -16,22 +18,12 @@ func Test(t *testing.T) {
 		return &serviceA{}, nil, nil
 	})
 	sa, err := Get[*serviceA](c, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sa == nil {
-		t.Fatal("nil service")
-	}
+	assert.NoError(t, err)
+	assert.PointerNotNil(t, sa)
 	sa, err = Get[*serviceA](c, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sa == nil {
-		t.Fatal("nil service")
-	}
-	if builderCallCount != 1 {
-		t.Fatal("builder called more than once")
-	}
+	assert.NoError(t, err)
+	assert.PointerNotNil(t, sa)
+	assert.Equal(t, builderCallCount, 1)
 }
 
 func TestSetPanicAlreadySet(t *testing.T) {
@@ -39,23 +31,17 @@ func TestSetPanicAlreadySet(t *testing.T) {
 	Set(c, "", func(c *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("no panic")
-		}
-	}()
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
-		return &serviceA{}, nil, nil
+	assert.Panics(t, func() {
+		Set(c, "", func(c *Container) (*serviceA, Close, error) {
+			return &serviceA{}, nil, nil
+		})
 	})
 }
 
 func TestGetErrorNotRegistered(t *testing.T) {
 	c := new(Container)
 	_, err := Get[*serviceA](c, "")
-	if err == nil {
-		t.Fatal("no error")
-	}
+	assert.Error(t, err)
 }
 
 func TestGetErrorType(t *testing.T) {
@@ -64,9 +50,7 @@ func TestGetErrorType(t *testing.T) {
 		return &serviceA{}, nil, nil
 	})
 	_, err := Get[*serviceB](c, "test")
-	if err == nil {
-		t.Fatal("no error")
-	}
+	assert.Error(t, err)
 }
 
 func TestGetErrorBuilder(t *testing.T) {
@@ -75,9 +59,7 @@ func TestGetErrorBuilder(t *testing.T) {
 		return nil, nil, errors.New("error")
 	})
 	_, err := Get[*serviceA](c, "")
-	if err == nil {
-		t.Fatal("no error")
-	}
+	assert.Error(t, err)
 }
 
 func TestClose(t *testing.T) {
@@ -90,15 +72,11 @@ func TestClose(t *testing.T) {
 		}, nil
 	})
 	_, err := Get[*serviceA](c, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	c.Close(func(err error) {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	})
-	if !closeServiceCalled {
-		t.Fatal("close service not called")
-	}
+	assert.True(t, closeServiceCalled)
 }
 
 func TestCloseNil(t *testing.T) {
@@ -107,11 +85,9 @@ func TestCloseNil(t *testing.T) {
 		return &serviceA{}, nil, nil
 	})
 	_, err := Get[*serviceA](c, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	c.Close(func(err error) {
-		t.Fatal(err)
+		assert.NoError(t, err)
 	})
 }
 
@@ -123,13 +99,9 @@ func TestCloseError(t *testing.T) {
 		}, nil
 	})
 	_, err := Get[*serviceA](c, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	c.Close(func(err error) {
-		if err == nil {
-			t.Fatal("no error")
-		}
+		assert.Error(t, err)
 	})
 }
 
@@ -138,13 +110,9 @@ func TestMust(t *testing.T) {
 }
 
 func TestMustPanic(t *testing.T) {
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("no panic")
-		}
-	}()
-	Must("", errors.New("error"))
+	assert.Panics(t, func() {
+		Must("", errors.New("error"))
+	})
 }
 
 func Example() {
