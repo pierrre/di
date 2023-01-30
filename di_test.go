@@ -19,10 +19,10 @@ func Test(t *testing.T) {
 	})
 	sa, err := Get[*serviceA](c, "")
 	assert.NoError(t, err)
-	assert.PointerNotNil(t, sa)
+	assert.NotZero(t, sa)
 	sa, err = Get[*serviceA](c, "")
 	assert.NoError(t, err)
-	assert.PointerNotNil(t, sa)
+	assert.NotZero(t, sa)
 	assert.Equal(t, builderCallCount, 1)
 }
 
