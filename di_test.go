@@ -8,7 +8,16 @@ import (
 	"testing"
 
 	"github.com/pierrre/assert"
+	"github.com/pierrre/assert/ext/davecghspew"
+	"github.com/pierrre/assert/ext/pierrrecompare"
+	"github.com/pierrre/assert/ext/pierrreerrors"
 )
+
+func init() {
+	pierrrecompare.Configure()
+	davecghspew.ConfigureDefault()
+	pierrreerrors.Configure()
+}
 
 func Test(t *testing.T) {
 	c := new(Container)
