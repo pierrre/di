@@ -127,10 +127,12 @@ func TestMustPanic(t *testing.T) {
 func Example() {
 	// New container.
 	c := new(Container)
+
 	// Set ServiceA.
 	Set(c, "", func(c *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
+
 	// Set ServiceB.
 	somethingWrong := false
 	Set(c, "", func(c *Container) (*serviceB, Close, error) {
@@ -144,6 +146,7 @@ func Example() {
 		}
 		return sb, sb.close, nil
 	})
+
 	// Set ServiceC.
 	Set(c, "", func(c *Container) (*serviceC, Close, error) {
 		sb, err := Get[*serviceB](c, "")
@@ -160,16 +163,19 @@ func Example() {
 		}
 		return sc, cl, nil
 	})
+
 	// Get ServiceC and call it.
 	sc, err := Get[*serviceC](c, "")
 	if err != nil {
 		panic(err)
 	}
 	sc.DoC()
+
 	// Close container.
 	c.Close(func(err error) {
 		panic(err)
 	})
+
 	// Output:
 	// do A
 	// do B
