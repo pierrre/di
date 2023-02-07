@@ -101,6 +101,8 @@ func (c *Container) Close(onErr func(error)) {
 			onErr(err)
 		}
 	}
+	c.getServiceNames = nil
+	c.getServiceOrdered = nil
 }
 
 // Builder builds a service.
@@ -144,10 +146,13 @@ func (sw *serviceWrapperImpl[S]) get(c *Container) (S, error) {
 func (sw *serviceWrapperImpl[S]) close() error {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
-	if !sw.initialized || sw.cl == nil {
+	if !sw.initialized {
 		return nil
 	}
-	err := sw.cl()
+	var err error
+	if sw.cl != nil {
+		err = sw.cl()
+	}
 	sw.initialized = false
 	var zero S
 	sw.service = zero

@@ -73,28 +73,52 @@ func TestGetErrorBuilder(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	c := new(Container)
-	var closeServiceCalled bool
+	builderCalled := 0
+	closeCalled := 0
 	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+		builderCalled++
 		return &serviceA{}, func() error {
-			closeServiceCalled = true
+			closeCalled++
 			return nil
 		}, nil
 	})
-	_, err := Get[*serviceA](c, "")
-	assert.NoError(t, err)
-	c.Close(func(err error) {
+	count := 5
+	for i := 0; i < count; i++ {
+		_, err := Get[*serviceA](c, "")
 		assert.NoError(t, err)
-	})
-	assert.True(t, closeServiceCalled)
+		c.Close(func(err error) {
+			assert.NoError(t, err)
+		})
+	}
+	assert.Equal(t, builderCalled, count)
+	assert.Equal(t, closeCalled, count)
 }
 
 func TestCloseNil(t *testing.T) {
 	c := new(Container)
+	builderCalled := 0
 	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+		builderCalled++
 		return &serviceA{}, nil, nil
 	})
+	count := 5
+	for i := 0; i < count; i++ {
+		_, err := Get[*serviceA](c, "")
+		assert.NoError(t, err)
+		c.Close(func(err error) {
+			assert.NoError(t, err)
+		})
+	}
+	assert.Equal(t, builderCalled, count)
+}
+
+func TestCloseNotInitialized(t *testing.T) {
+	c := new(Container)
+	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+		return nil, nil, errors.New("error")
+	})
 	_, err := Get[*serviceA](c, "")
-	assert.NoError(t, err)
+	assert.Error(t, err)
 	c.Close(func(err error) {
 		assert.NoError(t, err)
 	})
