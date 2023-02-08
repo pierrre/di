@@ -2,6 +2,7 @@
 package di
 
 import (
+	"errors"
 	"fmt"
 	"reflect" //nolint:depguard // Used for service name.
 	"sync"
@@ -18,15 +19,23 @@ import (
 // If the service creation fails, it returns an error.
 func Get[S any](c *Container, name string) (s S, err error) {
 	if name == "" {
-		name = getServiceName[S]()
+		name = getTypeName[S]()
 	}
 	sw := c.get(name)
 	if sw == nil {
-		return s, fmt.Errorf("service %q not registered", name)
+		return s, &ServiceError{
+			error: ErrNotSet,
+			Name:  name,
+		}
 	}
 	swi, ok := sw.(*serviceWrapperImpl[S])
 	if !ok {
-		return s, fmt.Errorf("service %q is not of type %T", name, s)
+		return s, &ServiceError{
+			error: &TypeError{
+				Type: getTypeName[S](),
+			},
+			Name: name,
+		}
 	}
 	return swi.get(c)
 }
@@ -38,7 +47,7 @@ func Get[S any](c *Container, name string) (s S, err error) {
 // If the service is already set, it panics.
 func Set[S any](c *Container, name string, b Builder[S]) {
 	if name == "" {
-		name = getServiceName[S]()
+		name = getTypeName[S]()
 	}
 	sw := &serviceWrapperImpl[S]{
 		builder: b,
@@ -48,10 +57,10 @@ func Set[S any](c *Container, name string, b Builder[S]) {
 
 // Container contains services.
 type Container struct {
-	mu                sync.Mutex
-	services          map[string]serviceWrapper
-	getServiceNames   map[string]struct{}
-	getServiceOrdered []serviceWrapper
+	mu                     sync.Mutex
+	services               map[string]serviceWrapper
+	getServiceNames        map[string]struct{}
+	getServiceNamesOrdered []string
 }
 
 func (c *Container) get(name string) serviceWrapper {
@@ -67,7 +76,7 @@ func (c *Container) get(name string) serviceWrapper {
 	_, ok = c.getServiceNames[name]
 	if !ok {
 		c.getServiceNames[name] = struct{}{}
-		c.getServiceOrdered = append(c.getServiceOrdered, sw)
+		c.getServiceNamesOrdered = append(c.getServiceNamesOrdered, name)
 	}
 	return sw
 }
@@ -80,7 +89,10 @@ func (c *Container) set(name string, sw serviceWrapper) {
 	}
 	_, ok := c.services[name]
 	if ok {
-		panic(fmt.Sprintf("service %q already set", name))
+		panic(&ServiceError{
+			error: ErrAlreadySet,
+			Name:  name,
+		})
 	}
 	c.services[name] = sw
 }
@@ -94,15 +106,20 @@ func (c *Container) set(name string, sw serviceWrapper) {
 func (c *Container) Close(onErr func(error)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for i := len(c.getServiceOrdered) - 1; i >= 0; i-- {
-		sw := c.getServiceOrdered[i]
+	for i := len(c.getServiceNamesOrdered) - 1; i >= 0; i-- {
+		name := c.getServiceNamesOrdered[i]
+		sw := c.services[name]
 		err := sw.close()
 		if err != nil {
+			err = &ServiceError{
+				error: err,
+				Name:  name,
+			}
 			onErr(err)
 		}
 	}
 	c.getServiceNames = nil
-	c.getServiceOrdered = nil
+	c.getServiceNamesOrdered = nil
 }
 
 // Builder builds a service.
@@ -168,8 +185,43 @@ func Must[T any](v T, err error) T {
 	return v
 }
 
-func getServiceName[S any]() string {
+func getTypeName[S any]() string {
 	var s S
 	// Use pointer in order to work with interface types.
-	return reflect.TypeOf(&s).Elem().String()
+	typ := reflect.TypeOf(&s).Elem()
+	pkgPath := typ.PkgPath()
+	if pkgPath != "" {
+		return pkgPath + "." + typ.Name()
+	}
+	return typ.String()
+}
+
+var (
+	// ErrNotSet is returned when a service is not set.
+	ErrNotSet = errors.New("not set")
+	// ErrAlreadySet is returned when a service is already set.
+	ErrAlreadySet = errors.New("already set")
+)
+
+// ServiceError represents an error related to a service.
+type ServiceError struct {
+	error
+	Name string
+}
+
+func (err *ServiceError) Unwrap() error {
+	return err.error
+}
+
+func (err *ServiceError) Error() string {
+	return fmt.Sprintf("service %q: %v", err.Name, err.error)
+}
+
+// TypeError represents an error related to a service type.
+type TypeError struct {
+	Type string
+}
+
+func (err *TypeError) Error() string {
+	return fmt.Sprintf("type %s does not match", err.Type)
 }
