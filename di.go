@@ -4,7 +4,7 @@ package di
 import (
 	"errors"
 	"fmt"
-	"reflect" //nolint:depguard // Used for service name.
+	"reflect"
 	"sync"
 )
 
