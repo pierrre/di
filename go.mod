@@ -1,6 +1,6 @@
 module github.com/pierrre/di
 
-go 1.21
+go 1.21.0
 
 require github.com/pierrre/assert v0.2.3
 
