@@ -8,16 +8,7 @@ import (
 	"testing"
 
 	"github.com/pierrre/assert"
-	"github.com/pierrre/assert/ext/pierrrecompare"
-	"github.com/pierrre/assert/ext/pierrreerrors"
-	"github.com/pierrre/assert/ext/pierrrepretty"
 )
-
-func init() {
-	pierrrecompare.Configure()
-	pierrrepretty.ConfigureDefault()
-	pierrreerrors.Configure()
-}
 
 func Example() {
 	// New container.
