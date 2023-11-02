@@ -8,7 +8,7 @@ import (
 	"sync"
 )
 
-// Get returns a service from a container.
+// Get returns a service from a [Container].
 //
 // If the name is empty, it is set to the type of the service.
 //
@@ -40,7 +40,7 @@ func Get[S any](c *Container, name string) (s S, err error) {
 	return swi.get(c)
 }
 
-// Set sets a service to a container.
+// Set sets a service to a [Container].
 //
 // If the name is empty, it is set to the type of the service.
 //
@@ -97,7 +97,7 @@ func (c *Container) set(name string, sw serviceWrapper) {
 	c.services[name] = sw
 }
 
-// Close closes the container.
+// Close closes the [Container].
 //
 // It closes all services in reverse dependency order.
 // The created services must not be used after this call.
@@ -124,7 +124,7 @@ func (c *Container) Close(onErr func(error)) {
 
 // Builder builds a service.
 //
-// The Close function allows to close the service.
+// The [Close] function allows to close the service.
 // It can be nil if the service does not need to be closed.
 // After it is called, the service instance must not be used anymore.
 type Builder[S any] func(c *Container) (S, Close, error)
