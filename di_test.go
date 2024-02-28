@@ -25,7 +25,7 @@ func Example() {
 		// We know that ServiceA's builder doesn't return an error, so we ignore it.
 		sa := Must(Get[*serviceA](c, ""))
 		if somethingWrong {
-			return nil, nil, fmt.Errorf("error")
+			return nil, nil, errors.New("error")
 		}
 		sb := &serviceB{
 			sa.DoA,
