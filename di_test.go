@@ -168,7 +168,35 @@ func TestGetErrorBuilder(t *testing.T) {
 		return nil, nil, errors.New("error")
 	})
 	_, err := Get[*serviceA](c, "")
-	assert.Error(t, err)
+	var serviceErr *ServiceError
+	assert.ErrorAs(t, err, &serviceErr)
+	assert.Equal(t, serviceErr.Name, "*di.serviceA")
+	assert.ErrorEqual(t, err, "service \"*di.serviceA\": error")
+}
+
+func TestGetAll(t *testing.T) {
+	c := new(Container)
+	Set(c, "1", func(c *Container) (*serviceA, Close, error) {
+		return &serviceA{}, nil, nil
+	})
+	Set(c, "2", func(c *Container) (*serviceA, Close, error) {
+		return &serviceA{}, nil, nil
+	})
+	ss, err := GetAll[*serviceA](c)
+	assert.NoError(t, err)
+	assert.MapLen(t, ss, 2)
+}
+
+func TestGetAllError(t *testing.T) {
+	c := new(Container)
+	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+		return nil, nil, errors.New("error")
+	})
+	_, err := GetAll[*serviceA](c)
+	var serviceErr *ServiceError
+	assert.ErrorAs(t, err, &serviceErr)
+	assert.Equal(t, serviceErr.Name, "*di.serviceA")
+	assert.ErrorEqual(t, err, "service \"*di.serviceA\": error")
 }
 
 func TestClose(t *testing.T) {

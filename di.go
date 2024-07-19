@@ -18,26 +18,53 @@ import (
 //
 // If the service creation fails, it returns an error.
 func Get[S any](c *Container, name string) (s S, err error) {
+	defer func() {
+		if err != nil {
+			err = &ServiceError{
+				error: err,
+				Name:  name,
+			}
+		}
+	}()
 	if name == "" {
 		name = getTypeName[S]()
 	}
 	sw := c.get(name)
 	if sw == nil {
-		return s, &ServiceError{
-			error: ErrNotSet,
-			Name:  name,
-		}
+		return s, ErrNotSet
 	}
 	swi, ok := sw.(*serviceWrapperImpl[S])
 	if !ok {
-		return s, &ServiceError{
-			error: &TypeError{
-				Type: getTypeName[S](),
-			},
-			Name: name,
+		return s, &TypeError{
+			Type: getTypeName[S](),
 		}
 	}
 	return swi.get(c)
+}
+
+// GetAll returns all services of a type from a [Container].
+//
+// The key of the map is the name of the service.
+func GetAll[S any](c *Container) (map[string]S, error) {
+	var names []string
+	c.all(func(name string, sw serviceWrapper) {
+		_, ok := sw.(*serviceWrapperImpl[S])
+		if ok {
+			names = append(names, name)
+		}
+	})
+	var ss map[string]S
+	if len(names) > 0 {
+		ss = make(map[string]S, len(names))
+	}
+	for _, name := range names {
+		s, err := Get[S](c, name)
+		if err != nil {
+			return nil, err
+		}
+		ss[name] = s
+	}
+	return ss, nil
 }
 
 // Set sets a service to a [Container].
@@ -95,6 +122,14 @@ func (c *Container) set(name string, sw serviceWrapper) {
 		})
 	}
 	c.services[name] = sw
+}
+
+func (c *Container) all(f func(name string, sw serviceWrapper)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for name, sw := range c.services {
+		f(name, sw)
+	}
 }
 
 // Close closes the [Container].
