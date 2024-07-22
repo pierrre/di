@@ -2,6 +2,7 @@
 package di
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -17,7 +18,7 @@ import (
 // If the service is not of the expected type, it returns an error.
 //
 // If the service creation fails, it returns an error.
-func Get[S any](c *Container, name string) (s S, err error) {
+func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err error) {
 	defer func() {
 		if err != nil {
 			err = &ServiceError{
@@ -29,7 +30,7 @@ func Get[S any](c *Container, name string) (s S, err error) {
 	if name == "" {
 		name = getTypeName[S]()
 	}
-	sw := c.get(name)
+	sw := ctn.get(name)
 	if sw == nil {
 		return s, ErrNotSet
 	}
@@ -39,15 +40,15 @@ func Get[S any](c *Container, name string) (s S, err error) {
 			Type: getTypeName[S](),
 		}
 	}
-	return swi.get(c)
+	return swi.get(ctx, ctn)
 }
 
 // GetAll returns all services of a type from a [Container].
 //
 // The key of the map is the name of the service.
-func GetAll[S any](c *Container) (map[string]S, error) {
+func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 	var names []string
-	c.all(func(name string, sw serviceWrapper) {
+	ctn.all(func(name string, sw serviceWrapper) {
 		_, ok := sw.(*serviceWrapperImpl[S])
 		if ok {
 			names = append(names, name)
@@ -58,7 +59,7 @@ func GetAll[S any](c *Container) (map[string]S, error) {
 		ss = make(map[string]S, len(names))
 	}
 	for _, name := range names {
-		s, err := Get[S](c, name)
+		s, err := Get[S](ctx, ctn, name)
 		if err != nil {
 			return nil, err
 		}
@@ -72,14 +73,14 @@ func GetAll[S any](c *Container) (map[string]S, error) {
 // If the name is empty, it is set to the type of the service.
 //
 // If the service is already set, it panics.
-func Set[S any](c *Container, name string, b Builder[S]) {
+func Set[S any](ctn *Container, name string, b Builder[S]) {
 	if name == "" {
 		name = getTypeName[S]()
 	}
 	sw := &serviceWrapperImpl[S]{
 		builder: b,
 	}
-	c.set(name, sw)
+	ctn.set(name, sw)
 }
 
 // Container contains services.
@@ -138,19 +139,19 @@ func (c *Container) all(f func(name string, sw serviceWrapper)) {
 // The created services must not be used after this call.
 //
 // The container can be reused after this call.
-func (c *Container) Close(onErr func(error)) {
+func (c *Container) Close(ctx context.Context, onErr func(context.Context, error)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i := len(c.getServiceNamesOrdered) - 1; i >= 0; i-- {
 		name := c.getServiceNamesOrdered[i]
 		sw := c.services[name]
-		err := sw.close()
+		err := sw.close(ctx)
 		if err != nil {
 			err = &ServiceError{
 				error: err,
 				Name:  name,
 			}
-			onErr(err)
+			onErr(ctx, err)
 		}
 	}
 	c.getServiceNames = nil
@@ -162,13 +163,13 @@ func (c *Container) Close(onErr func(error)) {
 // The [Close] function allows to close the service.
 // It can be nil if the service does not need to be closed.
 // After it is called, the service instance must not be used anymore.
-type Builder[S any] func(c *Container) (S, Close, error)
+type Builder[S any] func(ctx context.Context, ctn *Container) (S, Close, error)
 
 // Close closes a service.
-type Close = func() error
+type Close = func(ctx context.Context) error
 
 type serviceWrapper interface {
-	close() error
+	close(ctx context.Context) error
 }
 
 type serviceWrapperImpl[S any] struct {
@@ -179,13 +180,13 @@ type serviceWrapperImpl[S any] struct {
 	cl          Close
 }
 
-func (sw *serviceWrapperImpl[S]) get(c *Container) (S, error) {
+func (sw *serviceWrapperImpl[S]) get(ctx context.Context, ctn *Container) (S, error) {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 	if sw.initialized {
 		return sw.service, nil
 	}
-	s, cl, err := sw.builder(c)
+	s, cl, err := sw.builder(ctx, ctn)
 	if err != nil {
 		return s, err
 	}
@@ -195,7 +196,7 @@ func (sw *serviceWrapperImpl[S]) get(c *Container) (S, error) {
 	return sw.service, nil
 }
 
-func (sw *serviceWrapperImpl[S]) close() error {
+func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 	if !sw.initialized {
@@ -203,7 +204,7 @@ func (sw *serviceWrapperImpl[S]) close() error {
 	}
 	var err error
 	if sw.cl != nil {
-		err = sw.cl()
+		err = sw.cl(ctx)
 	}
 	sw.initialized = false
 	var zero S

@@ -2,6 +2,7 @@
 package di
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -11,31 +12,36 @@ import (
 )
 
 func Example() {
+	ctx := context.Background()
+
 	// New container.
-	c := new(Container)
+	ctn := new(Container)
 
 	// Set ServiceA.
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
 
 	// Set ServiceB.
 	somethingWrong := false
-	Set(c, "", func(c *Container) (*serviceB, Close, error) {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceB, Close, error) {
 		// We know that ServiceA's builder doesn't return an error, so we ignore it.
-		sa := Must(Get[*serviceA](c, ""))
+		sa := Must(Get[*serviceA](ctx, ctn, ""))
 		if somethingWrong {
 			return nil, nil, errors.New("error")
 		}
 		sb := &serviceB{
 			sa.DoA,
 		}
-		return sb, sb.close, nil
+		cl := func(ctx context.Context) error {
+			return sb.close()
+		}
+		return sb, cl, nil
 	})
 
 	// Set ServiceC.
-	Set(c, "", func(c *Container) (*serviceC, Close, error) {
-		sb, err := Get[*serviceB](c, "")
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceC, Close, error) {
+		sb, err := Get[*serviceB](ctx, ctn, "")
 		if err != nil {
 			return nil, nil, err
 		}
@@ -43,7 +49,7 @@ func Example() {
 			sb.DoB,
 		}
 		// The ServiceC close function doesn't return an error, so we wrap it.
-		cl := func() error {
+		cl := func(ctx context.Context) error {
 			sc.close()
 			return nil
 		}
@@ -51,14 +57,14 @@ func Example() {
 	})
 
 	// Get ServiceC and call it.
-	sc, err := Get[*serviceC](c, "")
+	sc, err := Get[*serviceC](ctx, ctn, "")
 	if err != nil {
 		panic(err)
 	}
 	sc.DoC()
 
 	// Close container.
-	c.Close(func(err error) {
+	ctn.Close(ctx, func(ctx context.Context, err error) {
 		panic(err)
 	})
 
@@ -104,28 +110,29 @@ func (sc *serviceC) close() {
 }
 
 func Test(t *testing.T) {
-	c := new(Container)
+	ctx := context.Background()
+	ctn := new(Container)
 	builderCallCount := 0
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		builderCallCount++
 		return &serviceA{}, nil, nil
 	})
-	sa, err := Get[*serviceA](c, "")
+	sa, err := Get[*serviceA](ctx, ctn, "")
 	assert.NoError(t, err)
 	assert.NotZero(t, sa)
-	sa, err = Get[*serviceA](c, "")
+	sa, err = Get[*serviceA](ctx, ctn, "")
 	assert.NoError(t, err)
 	assert.NotZero(t, sa)
 	assert.Equal(t, builderCallCount, 1)
 }
 
 func TestSetPanicAlreadySet(t *testing.T) {
-	c := new(Container)
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+	ctn := new(Container)
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
 	rec, _ := assert.Panics(t, func() {
-		Set(c, "", func(c *Container) (*serviceA, Close, error) {
+		Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 			return &serviceA{}, nil, nil
 		})
 	})
@@ -138,8 +145,9 @@ func TestSetPanicAlreadySet(t *testing.T) {
 }
 
 func TestGetErrorNotSet(t *testing.T) {
-	c := new(Container)
-	_, err := Get[*serviceA](c, "")
+	ctx := context.Background()
+	ctn := new(Container)
+	_, err := Get[*serviceA](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "*di.serviceA")
@@ -148,11 +156,12 @@ func TestGetErrorNotSet(t *testing.T) {
 }
 
 func TestGetErrorType(t *testing.T) {
-	c := new(Container)
-	Set(c, "test", func(c *Container) (*serviceA, Close, error) {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "test", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
-	_, err := Get[*serviceB](c, "test")
+	_, err := Get[*serviceB](ctx, ctn, "test")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "test")
@@ -163,11 +172,12 @@ func TestGetErrorType(t *testing.T) {
 }
 
 func TestGetErrorBuilder(t *testing.T) {
-	c := new(Container)
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return nil, nil, errors.New("error")
 	})
-	_, err := Get[*serviceA](c, "")
+	_, err := Get[*serviceA](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "*di.serviceA")
@@ -175,24 +185,26 @@ func TestGetErrorBuilder(t *testing.T) {
 }
 
 func TestGetAll(t *testing.T) {
-	c := new(Container)
-	Set(c, "1", func(c *Container) (*serviceA, Close, error) {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "1", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
-	Set(c, "2", func(c *Container) (*serviceA, Close, error) {
+	Set(ctn, "2", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
-	ss, err := GetAll[*serviceA](c)
+	ss, err := GetAll[*serviceA](ctx, ctn)
 	assert.NoError(t, err)
 	assert.MapLen(t, ss, 2)
 }
 
 func TestGetAllError(t *testing.T) {
-	c := new(Container)
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return nil, nil, errors.New("error")
 	})
-	_, err := GetAll[*serviceA](c)
+	_, err := GetAll[*serviceA](ctx, ctn)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "*di.serviceA")
@@ -200,21 +212,22 @@ func TestGetAllError(t *testing.T) {
 }
 
 func TestClose(t *testing.T) {
-	c := new(Container)
+	ctx := context.Background()
+	ctn := new(Container)
 	builderCalled := 0
 	closeCalled := 0
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		builderCalled++
-		return &serviceA{}, func() error {
+		return &serviceA{}, func(ctx context.Context) error {
 			closeCalled++
 			return nil
 		}, nil
 	})
 	count := 5
 	for i := 0; i < count; i++ {
-		_, err := Get[*serviceA](c, "")
+		_, err := Get[*serviceA](ctx, ctn, "")
 		assert.NoError(t, err)
-		c.Close(func(err error) {
+		ctn.Close(ctx, func(ctx context.Context, err error) {
 			assert.NoError(t, err)
 		})
 	}
@@ -223,17 +236,18 @@ func TestClose(t *testing.T) {
 }
 
 func TestCloseNil(t *testing.T) {
-	c := new(Container)
+	ctx := context.Background()
+	ctn := new(Container)
 	builderCalled := 0
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		builderCalled++
 		return &serviceA{}, nil, nil
 	})
 	count := 5
 	for i := 0; i < count; i++ {
-		_, err := Get[*serviceA](c, "")
+		_, err := Get[*serviceA](ctx, ctn, "")
 		assert.NoError(t, err)
-		c.Close(func(err error) {
+		ctn.Close(ctx, func(ctx context.Context, err error) {
 			assert.NoError(t, err)
 		})
 	}
@@ -241,27 +255,29 @@ func TestCloseNil(t *testing.T) {
 }
 
 func TestCloseNotInitialized(t *testing.T) {
-	c := new(Container)
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return nil, nil, errors.New("error")
 	})
-	_, err := Get[*serviceA](c, "")
+	_, err := Get[*serviceA](ctx, ctn, "")
 	assert.Error(t, err)
-	c.Close(func(err error) {
+	ctn.Close(ctx, func(ctx context.Context, err error) {
 		assert.NoError(t, err)
 	})
 }
 
 func TestCloseError(t *testing.T) {
-	c := new(Container)
-	Set(c, "", func(c *Container) (*serviceA, Close, error) {
-		return &serviceA{}, func() error {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
+		return &serviceA{}, func(ctx context.Context) error {
 			return errors.New("error")
 		}, nil
 	})
-	_, err := Get[*serviceA](c, "")
+	_, err := Get[*serviceA](ctx, ctn, "")
 	assert.NoError(t, err)
-	c.Close(func(err error) {
+	ctn.Close(ctx, func(ctx context.Context, err error) {
 		var serviceErr *ServiceError
 		assert.ErrorAs(t, err, &serviceErr)
 		assert.Equal(t, serviceErr.Name, "*di.serviceA")
