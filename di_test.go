@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"testing"
 
 	"github.com/pierrre/assert"
@@ -292,32 +291,4 @@ func TestMustPanic(t *testing.T) {
 	assert.Panics(t, func() {
 		Must("", errors.New("error"))
 	})
-}
-
-func TestGetTypeNameString(t *testing.T) {
-	s := getTypeName[string]()
-	assert.Equal(t, s, "string")
-}
-
-func TestGetTypeNameIOWriter(t *testing.T) {
-	s := getTypeName[io.Writer]()
-	assert.Equal(t, s, "io.Writer")
-}
-
-var benchmarkGetServiceNameResult string
-
-func BenchmarkGetTypeNameString(b *testing.B) {
-	var s string
-	for i := 0; i < b.N; i++ {
-		s = getTypeName[string]()
-	}
-	benchmarkGetServiceNameResult = s
-}
-
-func BenchmarkGetTypeNameIOWriter(b *testing.B) {
-	var s string
-	for i := 0; i < b.N; i++ {
-		s = getTypeName[io.Writer]()
-	}
-	benchmarkGetServiceNameResult = s
 }

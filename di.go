@@ -5,8 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"sync"
+
+	"github.com/pierrre/go-libs/reflectutil"
 )
 
 // Get returns a service from a [Container].
@@ -28,7 +29,7 @@ func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err erro
 		}
 	}()
 	if name == "" {
-		name = getTypeName[S]()
+		name = reflectutil.TypeFullNameFor[S]()
 	}
 	sw := ctn.get(name)
 	if sw == nil {
@@ -37,7 +38,7 @@ func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err erro
 	swi, ok := sw.(*serviceWrapperImpl[S])
 	if !ok {
 		return s, &TypeError{
-			Type: getTypeName[S](),
+			Type: reflectutil.TypeFullNameFor[S](),
 		}
 	}
 	return swi.get(ctx, ctn)
@@ -75,7 +76,7 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 // If the service is already set, it panics.
 func Set[S any](ctn *Container, name string, b Builder[S]) {
 	if name == "" {
-		name = getTypeName[S]()
+		name = reflectutil.TypeFullNameFor[S]()
 	}
 	sw := &serviceWrapperImpl[S]{
 		builder: b,
@@ -219,28 +220,6 @@ func Must[T any](v T, err error) T {
 		panic(err)
 	}
 	return v
-}
-
-var (
-	typeNameCache   = make(map[reflect.Type]string)
-	typeNameCacheMu sync.Mutex
-)
-
-func getTypeName[S any]() string {
-	typ := reflect.TypeFor[S]()
-	typeNameCacheMu.Lock()
-	defer typeNameCacheMu.Unlock()
-	name, ok := typeNameCache[typ]
-	if !ok {
-		pkgPath := typ.PkgPath()
-		if pkgPath != "" {
-			name = pkgPath + "." + typ.Name()
-		} else {
-			name = typ.String()
-		}
-		typeNameCache[typ] = name
-	}
-	return name
 }
 
 var (
