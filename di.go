@@ -221,15 +221,26 @@ func Must[T any](v T, err error) T {
 	return v
 }
 
+var (
+	typeNameCache   = make(map[reflect.Type]string)
+	typeNameCacheMu sync.Mutex
+)
+
 func getTypeName[S any]() string {
-	var s S
-	// Use pointer in order to work with interface types.
-	typ := reflect.TypeOf(&s).Elem()
-	pkgPath := typ.PkgPath()
-	if pkgPath != "" {
-		return pkgPath + "." + typ.Name()
+	typ := reflect.TypeFor[S]()
+	typeNameCacheMu.Lock()
+	defer typeNameCacheMu.Unlock()
+	name, ok := typeNameCache[typ]
+	if !ok {
+		pkgPath := typ.PkgPath()
+		if pkgPath != "" {
+			name = pkgPath + "." + typ.Name()
+		} else {
+			name = typ.String()
+		}
+		typeNameCache[typ] = name
 	}
-	return typ.String()
+	return name
 }
 
 var (
