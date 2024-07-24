@@ -20,26 +20,11 @@ import (
 //
 // If the service creation fails, it returns an error.
 func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err error) {
-	defer func() {
-		if err != nil {
-			err = &ServiceError{
-				error: err,
-				Name:  name,
-			}
-		}
-	}()
-	if name == "" {
-		name = reflectutil.TypeFullNameFor[S]()
-	}
-	sw := ctn.get(name)
-	if sw == nil {
-		return s, ErrNotSet
-	}
-	swi, ok := sw.(*serviceWrapperImpl[S])
-	if !ok {
-		return s, &TypeError{
-			Type: reflectutil.TypeFullNameFor[S](),
-		}
+	name = getName[S](name)
+	defer returnWrapServiceError(&err, name)
+	swi, err := getServiceWrapperImpl[S](ctn, name)
+	if err != nil {
+		return s, err
 	}
 	return swi.get(ctx, ctn)
 }
@@ -74,19 +59,59 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 	return ss, nil
 }
 
+// GetDependency returns a service [Dependency] tree from a [Container].
+func GetDependency[S any](ctx context.Context, ctn *Container, name string) (dep *Dependency, err error) {
+	name = getName[S](name)
+	defer returnWrapServiceError(&err, name)
+	swi, err := getServiceWrapperImpl[S](ctn, name)
+	if err != nil {
+		return nil, err
+	}
+	return swi.getDependency(ctx, ctn)
+}
+
 // Set sets a service to a [Container].
 //
 // If the name is empty, it is set to the type of the service.
 //
 // If the service is already set, it panics.
 func Set[S any](ctn *Container, name string, b Builder[S]) {
-	if name == "" {
-		name = reflectutil.TypeFullNameFor[S]()
-	}
+	name = getName[S](name)
 	sw := &serviceWrapperImpl[S]{
+		name:    name,
 		builder: b,
 	}
 	ctn.set(name, sw)
+}
+
+func getName[S any](name string) string {
+	if name == "" {
+		name = reflectutil.TypeFullNameFor[S]()
+	}
+	return name
+}
+
+func returnWrapServiceError(perr *error, name string) { //nolint:gocritic // We need a pointer of error.
+	if *perr != nil {
+		*perr = &ServiceError{
+			error: *perr,
+			Name:  name,
+		}
+	}
+}
+
+func getServiceWrapperImpl[S any](ctn *Container, name string) (swi *serviceWrapperImpl[S], err error) {
+	sw := ctn.get(name)
+	if sw == nil {
+		return nil, ErrNotSet
+	}
+	swi, ok := sw.(*serviceWrapperImpl[S])
+	if !ok {
+		return nil, &TypeError{
+			Type: reflectutil.TypeFullNameFor[S](),
+		}
+	}
+	return swi, nil
 }
 
 // Container contains services.
@@ -182,26 +207,53 @@ type serviceWrapper interface {
 
 type serviceWrapperImpl[S any] struct {
 	mu          sync.Mutex
+	name        string
 	builder     Builder[S]
 	initialized bool
 	service     S
 	cl          Close
+	dependency  *Dependency
 }
 
 func (sw *serviceWrapperImpl[S]) get(ctx context.Context, ctn *Container) (S, error) {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
-	if sw.initialized {
-		return sw.service, nil
+	err := sw.ensureInitialized(ctx, ctn)
+	if err != nil {
+		return sw.service, err
 	}
+	addDependencyToCollectorFromContext(ctx, sw.dependency)
+	return sw.service, nil
+}
+
+func (sw *serviceWrapperImpl[S]) getDependency(ctx context.Context, ctn *Container) (*Dependency, error) {
+	sw.mu.Lock()
+	defer sw.mu.Unlock()
+	err := sw.ensureInitialized(ctx, ctn)
+	if err != nil {
+		return nil, err
+	}
+	return sw.dependency, nil
+}
+
+func (sw *serviceWrapperImpl[S]) ensureInitialized(ctx context.Context, ctn *Container) error {
+	if sw.initialized {
+		return nil
+	}
+	ctx, dc := addDependencyCollectorToContext(ctx)
 	s, cl, err := sw.builder(ctx, ctn)
 	if err != nil {
-		return s, err
+		return err
 	}
 	sw.initialized = true
 	sw.service = s
 	sw.cl = cl
-	return sw.service, nil
+	sw.dependency = &Dependency{
+		Name:         sw.name,
+		Type:         reflectutil.TypeFullNameFor[S](),
+		Dependencies: dc.dependencies,
+	}
+	return nil
 }
 
 func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
@@ -218,7 +270,41 @@ func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
 	var zero S
 	sw.service = zero
 	sw.cl = nil
+	sw.dependency = nil
 	return err
+}
+
+// Dependency represents a service dependency.
+type Dependency struct {
+	Name         string        `json:"name"`
+	Type         string        `json:"type"`
+	Dependencies []*Dependency `json:"dependencies,omitempty"`
+}
+
+type dependencyCollector struct {
+	mu           sync.Mutex
+	dependencies []*Dependency
+}
+
+func (dc *dependencyCollector) add(d *Dependency) {
+	dc.mu.Lock()
+	defer dc.mu.Unlock()
+	dc.dependencies = append(dc.dependencies, d)
+}
+
+type dependencyCollectorContextKey struct{}
+
+func addDependencyCollectorToContext(ctx context.Context) (context.Context, *dependencyCollector) {
+	c := &dependencyCollector{}
+	ctx = context.WithValue(ctx, dependencyCollectorContextKey{}, c)
+	return ctx, c
+}
+
+func addDependencyToCollectorFromContext(ctx context.Context, d *Dependency) {
+	dc, ok := ctx.Value(dependencyCollectorContextKey{}).(*dependencyCollector)
+	if ok {
+		dc.add(d)
+	}
 }
 
 // Must is a helper to call a function and panics if it returns an error.

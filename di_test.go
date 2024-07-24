@@ -2,7 +2,9 @@
 package di
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -226,6 +228,167 @@ func TestGetAllError(t *testing.T) {
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
 	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": error")
+}
+
+func ExampleDependency() {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "1", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "2")
+		MustGet[string](ctx, ctn, "3")
+		return "", nil, nil
+	})
+	Set(ctn, "2", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "4")
+		MustGet[string](ctx, ctn, "5")
+		return "", nil, nil
+	})
+	Set(ctn, "3", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "4")
+		MustGet[string](ctx, ctn, "5")
+		return "", nil, nil
+	})
+	Set(ctn, "4", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
+	})
+	Set(ctn, "5", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
+	})
+	dep, err := GetDependency[string](ctx, ctn, "1")
+	if err != nil {
+		panic(err)
+	}
+	buf := new(bytes.Buffer)
+	enc := json.NewEncoder(buf)
+	enc.SetIndent("", "\t")
+	err = enc.Encode(dep)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(buf.String())
+
+	// Output:
+	// {
+	// 	"name": "1",
+	// 	"type": "string",
+	// 	"dependencies": [
+	// 		{
+	// 			"name": "2",
+	// 			"type": "string",
+	// 			"dependencies": [
+	// 				{
+	// 					"name": "4",
+	// 					"type": "string"
+	// 				},
+	// 				{
+	// 					"name": "5",
+	// 					"type": "string"
+	// 				}
+	// 			]
+	// 		},
+	// 		{
+	// 			"name": "3",
+	// 			"type": "string",
+	// 			"dependencies": [
+	// 				{
+	// 					"name": "4",
+	// 					"type": "string"
+	// 				},
+	// 				{
+	// 					"name": "5",
+	// 					"type": "string"
+	// 				}
+	// 			]
+	// 		}
+	// 	]
+	// }
+}
+
+func TestGetDependency(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "1", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "2")
+		MustGet[string](ctx, ctn, "3")
+		return "", nil, nil
+	})
+	Set(ctn, "2", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "4")
+		MustGet[string](ctx, ctn, "5")
+		return "", nil, nil
+	})
+	Set(ctn, "3", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "4")
+		MustGet[string](ctx, ctn, "5")
+		return "", nil, nil
+	})
+	Set(ctn, "4", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
+	})
+	Set(ctn, "5", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
+	})
+	dep, err := GetDependency[string](ctx, ctn, "1")
+	assert.NoError(t, err)
+	expected := &Dependency{
+		Name: "1",
+		Type: "string",
+		Dependencies: []*Dependency{
+			{
+				Name: "2",
+				Type: "string",
+				Dependencies: []*Dependency{
+					{
+						Name: "4",
+						Type: "string",
+					},
+					{
+						Name: "5",
+						Type: "string",
+					},
+				},
+			},
+			{
+				Name: "3",
+				Type: "string",
+				Dependencies: []*Dependency{
+					{
+						Name: "4",
+						Type: "string",
+					},
+					{
+						Name: "5",
+						Type: "string",
+					},
+				},
+			},
+		},
+	}
+	assert.DeepEqual(t, dep, expected)
+}
+
+func TestGetDependencyErrorNotSet(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	_, err := GetDependency[string](ctx, ctn, "")
+	assert.ErrorIs(t, err, ErrNotSet)
+	var serviceErr *ServiceError
+	assert.ErrorAs(t, err, &serviceErr)
+	assert.Equal(t, serviceErr.Name, "string")
+	assert.ErrorEqual(t, err, "service \"string\": not set")
+}
+
+func TestGetDependencyErrorBuilder(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, errors.New("error")
+	})
+	_, err := GetDependency[string](ctx, ctn, "")
+	var serviceErr *ServiceError
+	assert.ErrorAs(t, err, &serviceErr)
+	assert.Equal(t, serviceErr.Name, "string")
+	assert.ErrorEqual(t, err, "service \"string\": error")
 }
 
 func TestClose(t *testing.T) {
