@@ -44,6 +44,11 @@ func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err erro
 	return swi.get(ctx, ctn)
 }
 
+// MustGet calls [Get] with [Must].
+func MustGet[S any](ctx context.Context, ctn *Container, name string) S {
+	return Must(Get[S](ctx, ctn, name))
+}
+
 // GetAll returns all services of a type from a [Container].
 //
 // The key of the map is the name of the service.

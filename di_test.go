@@ -183,6 +183,24 @@ func TestGetErrorBuilder(t *testing.T) {
 	assert.ErrorEqual(t, err, "service \"*di.serviceA\": error")
 }
 
+func TestMustGet(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
+		return &serviceA{}, nil, nil
+	})
+	sa := MustGet[*serviceA](ctx, ctn, "")
+	assert.NotZero(t, sa)
+}
+
+func TestMustGetPanic(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	assert.Panics(t, func() {
+		MustGet[*serviceA](ctx, ctn, "")
+	})
+}
+
 func TestGetAll(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
