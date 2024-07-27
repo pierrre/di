@@ -25,7 +25,7 @@ func Example() {
 	somethingWrong := false
 	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceB, Close, error) {
 		// We know that ServiceA's builder doesn't return an error, so we ignore it.
-		sa := Must(Get[*serviceA](ctx, ctn, ""))
+		sa := MustGet[*serviceA](ctx, ctn, "")
 		if somethingWrong {
 			return nil, nil, errors.New("error")
 		}
