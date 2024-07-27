@@ -138,9 +138,9 @@ func TestSetPanicAlreadySet(t *testing.T) {
 	err, _ := assert.Type[error](t, rec)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*di.serviceA")
+	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
 	assert.ErrorIs(t, err, ErrAlreadySet)
-	assert.ErrorEqual(t, err, "service \"*di.serviceA\": already set")
+	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": already set")
 }
 
 func TestGetErrorNotSet(t *testing.T) {
@@ -149,9 +149,9 @@ func TestGetErrorNotSet(t *testing.T) {
 	_, err := Get[*serviceA](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*di.serviceA")
+	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
 	assert.ErrorIs(t, err, ErrNotSet)
-	assert.ErrorEqual(t, err, "service \"*di.serviceA\": not set")
+	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": not set")
 }
 
 func TestGetErrorType(t *testing.T) {
@@ -166,8 +166,8 @@ func TestGetErrorType(t *testing.T) {
 	assert.Equal(t, serviceErr.Name, "test")
 	var typeErr *TypeError
 	assert.ErrorAs(t, err, &typeErr)
-	assert.Equal(t, typeErr.Type, "*di.serviceB")
-	assert.ErrorEqual(t, err, "service \"test\": type *di.serviceB does not match")
+	assert.Equal(t, typeErr.Type, "*github.com/pierrre/di.serviceB")
+	assert.ErrorEqual(t, err, "service \"test\": type *github.com/pierrre/di.serviceB does not match")
 }
 
 func TestGetErrorBuilder(t *testing.T) {
@@ -179,8 +179,8 @@ func TestGetErrorBuilder(t *testing.T) {
 	_, err := Get[*serviceA](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*di.serviceA")
-	assert.ErrorEqual(t, err, "service \"*di.serviceA\": error")
+	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
+	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": error")
 }
 
 func TestMustGet(t *testing.T) {
@@ -224,8 +224,8 @@ func TestGetAllError(t *testing.T) {
 	_, err := GetAll[*serviceA](ctx, ctn)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*di.serviceA")
-	assert.ErrorEqual(t, err, "service \"*di.serviceA\": error")
+	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
+	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": error")
 }
 
 func TestClose(t *testing.T) {
@@ -297,7 +297,7 @@ func TestCloseError(t *testing.T) {
 	ctn.Close(ctx, func(ctx context.Context, err error) {
 		var serviceErr *ServiceError
 		assert.ErrorAs(t, err, &serviceErr)
-		assert.Equal(t, serviceErr.Name, "*di.serviceA")
+		assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
 	})
 }
 
