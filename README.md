@@ -12,6 +12,7 @@ Simple Go depency injection container with generics.
 - Close services in reverse dependency order
 - Type safe, no reflection or unsafe (uses generics)
 - [Dependency graph](https://pkg.go.dev/github.com/pierrre/di#example-Dependency)
+- Detect dependency cycle (error)
 
 ## Usage
 

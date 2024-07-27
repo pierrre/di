@@ -188,6 +188,40 @@ func TestGetErrorBuilder(t *testing.T) {
 	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": error")
 }
 
+func TestGetErrorCycle(t *testing.T) {
+	ctx := context.Background()
+	ctn := newTestContainerCycle()
+	_, err := Get[string](ctx, ctn, "a")
+	assert.ErrorIs(t, err, ErrCycle)
+	assert.ErrorEqual(t, err, "service \"a\": service \"b\": service \"c\": service \"a\": cycle")
+}
+
+func newTestContainerCycle() *Container {
+	ctn := new(Container)
+	Set(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		_, err := Get[string](ctx, ctn, "b")
+		if err != nil {
+			return "", nil, err
+		}
+		return "", nil, nil
+	})
+	Set(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		_, err := Get[string](ctx, ctn, "c")
+		if err != nil {
+			return "", nil, err
+		}
+		return "", nil, nil
+	})
+	Set(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		_, err := Get[string](ctx, ctn, "a")
+		if err != nil {
+			return "", nil, err
+		}
+		return "", nil, nil
+	})
+	return ctn
+}
+
 func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
@@ -415,6 +449,14 @@ func TestGetDependencyErrorBuilder(t *testing.T) {
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "string")
 	assert.ErrorEqual(t, err, "service \"string\": error")
+}
+
+func TestGetDependencyErrorCycle(t *testing.T) {
+	ctx := context.Background()
+	ctn := newTestContainerCycle()
+	_, err := GetDependency[string](ctx, ctn, "a")
+	assert.ErrorIs(t, err, ErrCycle)
+	assert.ErrorEqual(t, err, "service \"a\": service \"b\": service \"c\": service \"a\": cycle")
 }
 
 func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {

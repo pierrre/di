@@ -224,7 +224,7 @@ func newServiceWrapperImpl[S any](name string, builder Builder[S]) *serviceWrapp
 }
 
 func (sw *serviceWrapperImpl[S]) get(ctx context.Context, ctn *Container) (S, error) {
-	err := sw.mu.lock(ctx)
+	ctx, err := sw.mu.lock(ctx)
 	if err != nil {
 		return sw.service, err
 	}
@@ -238,7 +238,7 @@ func (sw *serviceWrapperImpl[S]) get(ctx context.Context, ctn *Container) (S, er
 }
 
 func (sw *serviceWrapperImpl[S]) getDependency(ctx context.Context, ctn *Container) (*Dependency, error) {
-	err := sw.mu.lock(ctx)
+	ctx, err := sw.mu.lock(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +271,7 @@ func (sw *serviceWrapperImpl[S]) ensureInitialized(ctx context.Context, ctn *Con
 }
 
 func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
-	err := sw.mu.lock(ctx)
+	ctx, err := sw.mu.lock(ctx)
 	if err != nil {
 		return err
 	}
@@ -340,6 +340,8 @@ var (
 	ErrNotSet = errors.New("not set")
 	// ErrAlreadySet is returned when a service is already set.
 	ErrAlreadySet = errors.New("already set")
+	// ErrCycle is returned when a cycle is detected.
+	ErrCycle = errors.New("cycle")
 )
 
 // ServiceError represents an error related to a service.
@@ -376,15 +378,32 @@ func newMutex() *mutex {
 	}
 }
 
-func (m *mutex) lock(ctx context.Context) error {
+func (m *mutex) lock(ctx context.Context) (context.Context, error) {
+	previous, _ := ctx.Value(mutexListContextKey{}).(*mutexList)
+	for v := previous; v != nil; v = v.previous {
+		if v.mu == m {
+			return nil, ErrCycle
+		}
+	}
 	select {
 	case m.ch <- struct{}{}:
-		return nil
+		ctx = context.WithValue(ctx, mutexListContextKey{}, &mutexList{
+			previous: previous,
+			mu:       m,
+		})
+		return ctx, nil
 	case <-ctx.Done():
-		return ctx.Err() //nolint:wrapcheck // We don't neet to wrap.
+		return nil, ctx.Err() //nolint:wrapcheck // We don't neet to wrap.
 	}
 }
 
 func (m *mutex) unlock() {
 	<-m.ch
 }
+
+type mutexList struct {
+	previous *mutexList
+	mu       *mutex
+}
+
+type mutexListContextKey struct{}
