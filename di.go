@@ -169,6 +169,8 @@ func (c *Container) Close(ctx context.Context, onErr func(context.Context, error
 // The [Close] function allows to close the service.
 // It can be nil if the service does not need to be closed.
 // After it is called, the service instance must not be used anymore.
+//
+// If it calls [Get] it must provide the same [context.Context].
 type Builder[S any] func(ctx context.Context, ctn *Container) (S, Close, error)
 
 // Close closes a service.
