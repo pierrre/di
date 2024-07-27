@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
 
 	"github.com/pierrre/go-libs/reflectutil"
@@ -108,7 +109,8 @@ func getServiceWrapperImpl[S any](ctn *Container, name string) (swi *serviceWrap
 	swi, ok := sw.(*serviceWrapperImpl[S])
 	if !ok {
 		return nil, &TypeError{
-			Type: reflectutil.TypeFullNameFor[S](),
+			Service:  sw.getType(),
+			Expected: reflect.TypeFor[S](),
 		}
 	}
 	return swi, nil
@@ -203,6 +205,7 @@ type Close = func(ctx context.Context) error
 
 type serviceWrapper interface {
 	close(ctx context.Context) error
+	getType() reflect.Type
 }
 
 type serviceWrapperImpl[S any] struct {
@@ -274,6 +277,10 @@ func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
 	return err
 }
 
+func (sw *serviceWrapperImpl[S]) getType() reflect.Type {
+	return reflect.TypeFor[S]()
+}
+
 // Dependency represents a service dependency.
 type Dependency struct {
 	Name         string        `json:"name"`
@@ -338,9 +345,10 @@ func (err *ServiceError) Error() string {
 
 // TypeError represents an error related to a service type.
 type TypeError struct {
-	Type string
+	Service  reflect.Type
+	Expected reflect.Type
 }
 
 func (err *TypeError) Error() string {
-	return fmt.Sprintf("type %s does not match", err.Type)
+	return fmt.Sprintf("service type %s does not match the expected type %s", reflectutil.TypeFullName(err.Service), reflectutil.TypeFullName(err.Expected))
 }

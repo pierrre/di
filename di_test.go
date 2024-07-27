@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/pierrre/assert"
@@ -168,8 +169,9 @@ func TestGetErrorType(t *testing.T) {
 	assert.Equal(t, serviceErr.Name, "test")
 	var typeErr *TypeError
 	assert.ErrorAs(t, err, &typeErr)
-	assert.Equal(t, typeErr.Type, "*github.com/pierrre/di.serviceB")
-	assert.ErrorEqual(t, err, "service \"test\": type *github.com/pierrre/di.serviceB does not match")
+	assert.Equal(t, typeErr.Service, reflect.TypeFor[*serviceA]())
+	assert.Equal(t, typeErr.Expected, reflect.TypeFor[*serviceB]())
+	assert.ErrorEqual(t, err, "service \"test\": service type *github.com/pierrre/di.serviceA does not match the expected type *github.com/pierrre/di.serviceB")
 }
 
 func TestGetErrorBuilder(t *testing.T) {
