@@ -30,7 +30,7 @@ func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err erro
 	return swi.get(ctx, ctn)
 }
 
-// MustGet calls [Get] with [Must].
+// MustGet calls [Get] and panics if there is an error.
 func MustGet[S any](ctx context.Context, ctn *Container, name string) S {
 	s, err := Get[S](ctx, ctn, name)
 	if err != nil {
