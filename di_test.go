@@ -67,9 +67,10 @@ func Example() {
 	sc.DoC()
 
 	// Close container.
-	ctn.Close(ctx, func(ctx context.Context, err error) {
+	err = ctn.Close(ctx)
+	if err != nil {
 		panic(err)
-	})
+	}
 
 	// Output:
 	// do A
@@ -498,9 +499,8 @@ func TestClose(t *testing.T) {
 	for i := 0; i < count; i++ {
 		_, err := Get[*serviceA](ctx, ctn, "")
 		assert.NoError(t, err)
-		ctn.Close(ctx, func(ctx context.Context, err error) {
-			assert.NoError(t, err)
-		})
+		err = ctn.Close(ctx)
+		assert.NoError(t, err)
 	}
 	assert.Equal(t, builderCalled, count)
 	assert.Equal(t, closeCalled, count)
@@ -518,9 +518,8 @@ func TestCloseNil(t *testing.T) {
 	for i := 0; i < count; i++ {
 		_, err := Get[*serviceA](ctx, ctn, "")
 		assert.NoError(t, err)
-		ctn.Close(ctx, func(ctx context.Context, err error) {
-			assert.NoError(t, err)
-		})
+		err = ctn.Close(ctx)
+		assert.NoError(t, err)
 	}
 	assert.Equal(t, builderCalled, count)
 }
@@ -533,9 +532,8 @@ func TestCloseNotInitialized(t *testing.T) {
 	})
 	_, err := Get[*serviceA](ctx, ctn, "")
 	assert.Error(t, err)
-	ctn.Close(ctx, func(ctx context.Context, err error) {
-		assert.NoError(t, err)
-	})
+	err = ctn.Close(ctx)
+	assert.NoError(t, err)
 }
 
 func TestCloseError(t *testing.T) {
@@ -548,11 +546,10 @@ func TestCloseError(t *testing.T) {
 	})
 	_, err := Get[*serviceA](ctx, ctn, "")
 	assert.NoError(t, err)
-	ctn.Close(ctx, func(ctx context.Context, err error) {
-		var serviceErr *ServiceError
-		assert.ErrorAs(t, err, &serviceErr)
-		assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
-	})
+	err = ctn.Close(ctx)
+	var serviceErr *ServiceError
+	assert.ErrorAs(t, err, &serviceErr)
+	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
 }
 
 func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
@@ -574,12 +571,8 @@ func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	<-started
 	ctx, cancel := context.WithCancel(ctx)
 	cancel()
-	called := false
-	ctn.Close(ctx, func(ctx context.Context, err error) {
-		called = true
-		assert.ErrorIs(t, err, context.Canceled)
-	})
-	assert.True(t, called)
+	err := ctn.Close(ctx)
+	assert.ErrorIs(t, err, context.Canceled)
 }
 
 func TestMust(t *testing.T) {

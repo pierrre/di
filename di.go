@@ -169,9 +169,10 @@ func (c *Container) all(f func(name string, sw serviceWrapper)) {
 // The created services must not be used after this call.
 //
 // The container can be reused after this call.
-func (c *Container) Close(ctx context.Context, onErr func(context.Context, error)) {
+func (c *Container) Close(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	var errs []error
 	for i := len(c.getServiceNamesOrdered) - 1; i >= 0; i-- {
 		name := c.getServiceNamesOrdered[i]
 		sw := c.services[name]
@@ -181,11 +182,12 @@ func (c *Container) Close(ctx context.Context, onErr func(context.Context, error
 				error: err,
 				Name:  name,
 			}
-			onErr(ctx, err)
+			errs = append(errs, err)
 		}
 	}
 	c.getServiceNames = nil
 	c.getServiceNamesOrdered = nil
+	return errors.Join(errs...)
 }
 
 // Builder builds a service.
