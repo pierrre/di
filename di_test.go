@@ -130,7 +130,7 @@ func TestGetErrorType(t *testing.T) {
 	assert.ErrorAs(t, err, &typeErr)
 	assert.Equal(t, typeErr.Service, reflect.TypeFor[string]())
 	assert.Equal(t, typeErr.Expected, reflect.TypeFor[int]())
-	assert.ErrorEqual(t, err, "service \"test\": service type string does not match the expected type int")
+	assert.ErrorEqual(t, err, "service \"test\": type string does not match the expected type int")
 }
 
 func TestGetErrorBuilder(t *testing.T) {
@@ -284,7 +284,6 @@ func ExampleDependency() {
 		panic(err)
 	}
 	fmt.Println(buf.String())
-
 	// Output:
 	// {
 	// 	"name": "a",

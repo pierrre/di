@@ -367,7 +367,7 @@ type TypeError struct {
 }
 
 func (err *TypeError) Error() string {
-	return fmt.Sprintf("service type %s does not match the expected type %s", reflectutil.TypeFullName(err.Service), reflectutil.TypeFullName(err.Expected))
+	return fmt.Sprintf("type %s does not match the expected type %s", reflectutil.TypeFullName(err.Service), reflectutil.TypeFullName(err.Expected))
 }
 
 type mutex struct {
