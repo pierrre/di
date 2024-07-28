@@ -74,14 +74,14 @@ func Test(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
 	builderCallCount := 0
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCallCount++
-		return &serviceA{}, nil, nil
+		return "test", nil, nil
 	})
-	sa, err := Get[*serviceA](ctx, ctn, "")
+	sa, err := Get[string](ctx, ctn, "")
 	assert.NoError(t, err)
 	assert.NotZero(t, sa)
-	sa, err = Get[*serviceA](ctx, ctn, "")
+	sa, err = Get[string](ctx, ctn, "")
 	assert.NoError(t, err)
 	assert.NotZero(t, sa)
 	assert.Equal(t, builderCallCount, 1)
@@ -89,61 +89,61 @@ func Test(t *testing.T) {
 
 func TestSetPanicAlreadySet(t *testing.T) {
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return &serviceA{}, nil, nil
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
 	})
 	rec, _ := assert.Panics(t, func() {
-		Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-			return &serviceA{}, nil, nil
+		Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+			return "", nil, nil
 		})
 	})
 	err, _ := assert.Type[error](t, rec)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
+	assert.Equal(t, serviceErr.Name, "string")
 	assert.ErrorIs(t, err, ErrAlreadySet)
-	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": already set")
+	assert.ErrorEqual(t, err, "service \"string\": already set")
 }
 
 func TestGetErrorNotSet(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	_, err := Get[*serviceA](ctx, ctn, "")
+	_, err := Get[string](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
+	assert.Equal(t, serviceErr.Name, "string")
 	assert.ErrorIs(t, err, ErrNotSet)
-	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": not set")
+	assert.ErrorEqual(t, err, "service \"string\": not set")
 }
 
 func TestGetErrorType(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "test", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return &serviceA{}, nil, nil
+	Set(ctn, "test", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
 	})
-	_, err := Get[*serviceB](ctx, ctn, "test")
+	_, err := Get[int](ctx, ctn, "test")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "test")
 	var typeErr *TypeError
 	assert.ErrorAs(t, err, &typeErr)
-	assert.Equal(t, typeErr.Service, reflect.TypeFor[*serviceA]())
-	assert.Equal(t, typeErr.Expected, reflect.TypeFor[*serviceB]())
-	assert.ErrorEqual(t, err, "service \"test\": service type *github.com/pierrre/di.serviceA does not match the expected type *github.com/pierrre/di.serviceB")
+	assert.Equal(t, typeErr.Service, reflect.TypeFor[string]())
+	assert.Equal(t, typeErr.Expected, reflect.TypeFor[int]())
+	assert.ErrorEqual(t, err, "service \"test\": service type string does not match the expected type int")
 }
 
 func TestGetErrorBuilder(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return nil, nil, errors.New("error")
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, errors.New("error")
 	})
-	_, err := Get[*serviceA](ctx, ctn, "")
+	_, err := Get[string](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
-	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": error")
+	assert.Equal(t, serviceErr.Name, "string")
+	assert.ErrorEqual(t, err, "service \"string\": error")
 }
 
 func TestGetErrorCycle(t *testing.T) {
@@ -206,10 +206,10 @@ func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 func TestMustGet(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return &serviceA{}, nil, nil
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "test", nil, nil
 	})
-	sa := MustGet[*serviceA](ctx, ctn, "")
+	sa := MustGet[string](ctx, ctn, "")
 	assert.NotZero(t, sa)
 }
 
@@ -217,20 +217,20 @@ func TestMustGetPanic(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
 	assert.Panics(t, func() {
-		MustGet[*serviceA](ctx, ctn, "")
+		MustGet[string](ctx, ctn, "")
 	})
 }
 
 func TestGetAll(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "1", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return &serviceA{}, nil, nil
+	Set(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
 	})
-	Set(ctn, "2", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return &serviceA{}, nil, nil
+	Set(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
 	})
-	ss, err := GetAll[*serviceA](ctx, ctn)
+	ss, err := GetAll[string](ctx, ctn)
 	assert.NoError(t, err)
 	assert.MapLen(t, ss, 2)
 }
@@ -238,14 +238,14 @@ func TestGetAll(t *testing.T) {
 func TestGetAllError(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return nil, nil, errors.New("error")
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, errors.New("error")
 	})
-	_, err := GetAll[*serviceA](ctx, ctn)
+	_, err := GetAll[string](ctx, ctn)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
-	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": error")
+	assert.Equal(t, serviceErr.Name, "string")
+	assert.ErrorEqual(t, err, "service \"string\": error")
 }
 
 func ExampleDependency() {
@@ -445,16 +445,16 @@ func TestClose(t *testing.T) {
 	ctn := new(Container)
 	builderCalled := 0
 	closeCalled := 0
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCalled++
-		return &serviceA{}, func(ctx context.Context) error {
+		return "", func(ctx context.Context) error {
 			closeCalled++
 			return nil
 		}, nil
 	})
 	count := 5
 	for i := 0; i < count; i++ {
-		_, err := Get[*serviceA](ctx, ctn, "")
+		_, err := Get[string](ctx, ctn, "")
 		assert.NoError(t, err)
 		err = ctn.Close(ctx)
 		assert.NoError(t, err)
@@ -467,13 +467,13 @@ func TestCloseNil(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
 	builderCalled := 0
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCalled++
-		return &serviceA{}, nil, nil
+		return "", nil, nil
 	})
 	count := 5
 	for i := 0; i < count; i++ {
-		_, err := Get[*serviceA](ctx, ctn, "")
+		_, err := Get[string](ctx, ctn, "")
 		assert.NoError(t, err)
 		err = ctn.Close(ctx)
 		assert.NoError(t, err)
@@ -484,10 +484,10 @@ func TestCloseNil(t *testing.T) {
 func TestCloseNotInitialized(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return nil, nil, errors.New("error")
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, errors.New("error")
 	})
-	_, err := Get[*serviceA](ctx, ctn, "")
+	_, err := Get[string](ctx, ctn, "")
 	assert.Error(t, err)
 	err = ctn.Close(ctx)
 	assert.NoError(t, err)
@@ -496,17 +496,17 @@ func TestCloseNotInitialized(t *testing.T) {
 func TestCloseError(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
-		return &serviceA{}, func(ctx context.Context) error {
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", func(ctx context.Context) error {
 			return errors.New("error")
 		}, nil
 	})
-	_, err := Get[*serviceA](ctx, ctn, "")
+	_, err := Get[string](ctx, ctn, "")
 	assert.NoError(t, err)
 	err = ctn.Close(ctx)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
+	assert.Equal(t, serviceErr.Name, "string")
 }
 
 func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
