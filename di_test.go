@@ -259,28 +259,28 @@ func TestGetAllError(t *testing.T) {
 func ExampleDependency() {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "1", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		MustGet[string](ctx, ctn, "2")
-		MustGet[string](ctx, ctn, "3")
+	Set(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "b")
+		MustGet[string](ctx, ctn, "c")
 		return "", nil, nil
 	})
-	Set(ctn, "2", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		MustGet[string](ctx, ctn, "4")
-		MustGet[string](ctx, ctn, "5")
+	Set(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "d")
+		MustGet[string](ctx, ctn, "e")
 		return "", nil, nil
 	})
-	Set(ctn, "3", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		MustGet[string](ctx, ctn, "4")
-		MustGet[string](ctx, ctn, "5")
+	Set(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "d")
+		MustGet[string](ctx, ctn, "e")
 		return "", nil, nil
 	})
-	Set(ctn, "4", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	Set(ctn, "d", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	Set(ctn, "5", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	Set(ctn, "e", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	dep, err := GetDependency[string](ctx, ctn, "1")
+	dep, err := GetDependency[string](ctx, ctn, "a")
 	if err != nil {
 		panic(err)
 	}
@@ -295,33 +295,33 @@ func ExampleDependency() {
 
 	// Output:
 	// {
-	// 	"name": "1",
+	// 	"name": "a",
 	// 	"type": "string",
 	// 	"dependencies": [
 	// 		{
-	// 			"name": "2",
+	// 			"name": "b",
 	// 			"type": "string",
 	// 			"dependencies": [
 	// 				{
-	// 					"name": "4",
+	// 					"name": "d",
 	// 					"type": "string"
 	// 				},
 	// 				{
-	// 					"name": "5",
+	// 					"name": "e",
 	// 					"type": "string"
 	// 				}
 	// 			]
 	// 		},
 	// 		{
-	// 			"name": "3",
+	// 			"name": "c",
 	// 			"type": "string",
 	// 			"dependencies": [
 	// 				{
-	// 					"name": "4",
+	// 					"name": "d",
 	// 					"type": "string"
 	// 				},
 	// 				{
-	// 					"name": "5",
+	// 					"name": "e",
 	// 					"type": "string"
 	// 				}
 	// 			]
@@ -333,57 +333,57 @@ func ExampleDependency() {
 func TestGetDependency(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "1", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		MustGet[string](ctx, ctn, "2")
-		MustGet[string](ctx, ctn, "3")
+	Set(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "b")
+		MustGet[string](ctx, ctn, "c")
 		return "", nil, nil
 	})
-	Set(ctn, "2", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		MustGet[string](ctx, ctn, "4")
-		MustGet[string](ctx, ctn, "5")
+	Set(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "d")
+		MustGet[string](ctx, ctn, "e")
 		return "", nil, nil
 	})
-	Set(ctn, "3", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		MustGet[string](ctx, ctn, "4")
-		MustGet[string](ctx, ctn, "5")
+	Set(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "d")
+		MustGet[string](ctx, ctn, "e")
 		return "", nil, nil
 	})
-	Set(ctn, "4", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	Set(ctn, "d", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	Set(ctn, "5", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	Set(ctn, "e", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	dep, err := GetDependency[string](ctx, ctn, "1")
+	dep, err := GetDependency[string](ctx, ctn, "a")
 	assert.NoError(t, err)
 	expected := &Dependency{
-		Name: "1",
+		Name: "a",
 		Type: "string",
 		Dependencies: []*Dependency{
 			{
-				Name: "2",
+				Name: "b",
 				Type: "string",
 				Dependencies: []*Dependency{
 					{
-						Name: "4",
+						Name: "d",
 						Type: "string",
 					},
 					{
-						Name: "5",
+						Name: "e",
 						Type: "string",
 					},
 				},
 			},
 			{
-				Name: "3",
+				Name: "c",
 				Type: "string",
 				Dependencies: []*Dependency{
 					{
-						Name: "4",
+						Name: "d",
 						Type: "string",
 					},
 					{
-						Name: "5",
+						Name: "e",
 						Type: "string",
 					},
 				},
