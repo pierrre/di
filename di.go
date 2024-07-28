@@ -78,10 +78,7 @@ func GetDependency[S any](ctx context.Context, ctn *Container, name string) (dep
 // If the service is already set, it panics.
 func Set[S any](ctn *Container, name string, b Builder[S]) {
 	name = getName[S](name)
-	sw := &serviceWrapperImpl[S]{
-		name:    name,
-		builder: b,
-	}
+	sw := newServiceWrapperImpl(name, b)
 	ctn.set(name, sw)
 }
 
@@ -216,6 +213,13 @@ type serviceWrapperImpl[S any] struct {
 	service     S
 	cl          Close
 	dependency  *Dependency
+}
+
+func newServiceWrapperImpl[S any](name string, builder Builder[S]) *serviceWrapperImpl[S] {
+	return &serviceWrapperImpl[S]{
+		name:    name,
+		builder: builder,
+	}
 }
 
 func (sw *serviceWrapperImpl[S]) get(ctx context.Context, ctn *Container) (S, error) {
