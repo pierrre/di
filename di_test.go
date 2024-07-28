@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/pierrre/assert"
+	"github.com/pierrre/go-libs/goroutine"
 )
 
 func Example() {
@@ -185,6 +186,29 @@ func TestGetErrorBuilder(t *testing.T) {
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
 	assert.ErrorEqual(t, err, "service \"*github.com/pierrre/di.serviceA\": error")
+}
+
+func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	started := make(chan struct{})
+	block := make(chan struct{})
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		close(started)
+		<-block
+		return "", nil, nil
+	})
+	wait := goroutine.Wait(ctx, func(ctx context.Context) {
+		_, err := Get[string](ctx, ctn, "")
+		assert.NoError(t, err)
+	})
+	defer wait()
+	defer close(block)
+	<-started
+	ctx, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err := Get[string](ctx, ctn, "")
+	assert.ErrorIs(t, err, context.Canceled)
 }
 
 func TestMustGet(t *testing.T) {
@@ -393,6 +417,29 @@ func TestGetDependencyErrorBuilder(t *testing.T) {
 	assert.ErrorEqual(t, err, "service \"string\": error")
 }
 
+func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	started := make(chan struct{})
+	block := make(chan struct{})
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		close(started)
+		<-block
+		return "", nil, nil
+	})
+	wait := goroutine.Wait(ctx, func(ctx context.Context) {
+		_, err := Get[string](ctx, ctn, "")
+		assert.NoError(t, err)
+	})
+	defer wait()
+	defer close(block)
+	<-started
+	ctx, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err := GetDependency[string](ctx, ctn, "")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
 func TestClose(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
@@ -464,6 +511,33 @@ func TestCloseError(t *testing.T) {
 		assert.ErrorAs(t, err, &serviceErr)
 		assert.Equal(t, serviceErr.Name, "*github.com/pierrre/di.serviceA")
 	})
+}
+
+func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	started := make(chan struct{})
+	block := make(chan struct{})
+	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		close(started)
+		<-block
+		return "", nil, nil
+	})
+	wait := goroutine.Wait(ctx, func(ctx context.Context) {
+		_, err := Get[string](ctx, ctn, "")
+		assert.NoError(t, err)
+	})
+	defer wait()
+	defer close(block)
+	<-started
+	ctx, cancel := context.WithCancel(ctx)
+	cancel()
+	called := false
+	ctn.Close(ctx, func(ctx context.Context, err error) {
+		called = true
+		assert.ErrorIs(t, err, context.Canceled)
+	})
+	assert.True(t, called)
 }
 
 func TestMust(t *testing.T) {

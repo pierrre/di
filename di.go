@@ -206,7 +206,7 @@ type serviceWrapper interface {
 }
 
 type serviceWrapperImpl[S any] struct {
-	mu          sync.Mutex
+	mu          *mutex
 	name        string
 	builder     Builder[S]
 	initialized bool
@@ -217,15 +217,19 @@ type serviceWrapperImpl[S any] struct {
 
 func newServiceWrapperImpl[S any](name string, builder Builder[S]) *serviceWrapperImpl[S] {
 	return &serviceWrapperImpl[S]{
+		mu:      newMutex(),
 		name:    name,
 		builder: builder,
 	}
 }
 
 func (sw *serviceWrapperImpl[S]) get(ctx context.Context, ctn *Container) (S, error) {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
-	err := sw.ensureInitialized(ctx, ctn)
+	err := sw.mu.lock(ctx)
+	if err != nil {
+		return sw.service, err
+	}
+	defer sw.mu.unlock()
+	err = sw.ensureInitialized(ctx, ctn)
 	if err != nil {
 		return sw.service, err
 	}
@@ -234,9 +238,12 @@ func (sw *serviceWrapperImpl[S]) get(ctx context.Context, ctn *Container) (S, er
 }
 
 func (sw *serviceWrapperImpl[S]) getDependency(ctx context.Context, ctn *Container) (*Dependency, error) {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
-	err := sw.ensureInitialized(ctx, ctn)
+	err := sw.mu.lock(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer sw.mu.unlock()
+	err = sw.ensureInitialized(ctx, ctn)
 	if err != nil {
 		return nil, err
 	}
@@ -264,12 +271,14 @@ func (sw *serviceWrapperImpl[S]) ensureInitialized(ctx context.Context, ctn *Con
 }
 
 func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
-	sw.mu.Lock()
-	defer sw.mu.Unlock()
+	err := sw.mu.lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer sw.mu.unlock()
 	if !sw.initialized {
 		return nil
 	}
-	var err error
 	if sw.cl != nil {
 		err = sw.cl(ctx)
 	}
@@ -355,4 +364,27 @@ type TypeError struct {
 
 func (err *TypeError) Error() string {
 	return fmt.Sprintf("service type %s does not match the expected type %s", reflectutil.TypeFullName(err.Service), reflectutil.TypeFullName(err.Expected))
+}
+
+type mutex struct {
+	ch chan struct{}
+}
+
+func newMutex() *mutex {
+	return &mutex{
+		ch: make(chan struct{}, 1),
+	}
+}
+
+func (m *mutex) lock(ctx context.Context) error {
+	select {
+	case m.ch <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err() //nolint:wrapcheck // We don't neet to wrap.
+	}
+}
+
+func (m *mutex) unlock() {
+	<-m.ch
 }
