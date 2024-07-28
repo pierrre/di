@@ -16,68 +16,29 @@ import (
 
 func Example() {
 	ctx := context.Background()
-
-	// New container.
 	ctn := new(Container)
-
-	// Set ServiceA.
+	defer ctn.Close(ctx)
 	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
-
-	// Set ServiceB.
-	somethingWrong := false
 	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceB, Close, error) {
-		// We know that ServiceA's builder doesn't return an error, so we ignore it.
-		sa := MustGet[*serviceA](ctx, ctn, "")
-		if somethingWrong {
-			return nil, nil, errors.New("error")
-		}
 		sb := &serviceB{
-			sa.DoA,
+			sa: MustGet[*serviceA](ctx, ctn, "").DoA,
 		}
-		cl := func(ctx context.Context) error {
-			return sb.close()
-		}
-		return sb, cl, nil
+		return sb, sb.close, nil
 	})
-
-	// Set ServiceC.
 	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceC, Close, error) {
-		sb, err := Get[*serviceB](ctx, ctn, "")
-		if err != nil {
-			return nil, nil, err
-		}
-		sc := &serviceC{
-			sb.DoB,
-		}
-		// The ServiceC close function doesn't return an error, so we wrap it.
-		cl := func(ctx context.Context) error {
-			sc.close()
-			return nil
-		}
-		return sc, cl, nil
+		return &serviceC{
+			sb: MustGet[*serviceB](ctx, ctn, "").DoB,
+		}, nil, nil
 	})
-
-	// Get ServiceC and call it.
-	sc, err := Get[*serviceC](ctx, ctn, "")
-	if err != nil {
-		panic(err)
-	}
+	sc := MustGet[*serviceC](ctx, ctn, "")
 	sc.DoC()
-
-	// Close container.
-	err = ctn.Close(ctx)
-	if err != nil {
-		panic(err)
-	}
-
 	// Output:
 	// do A
 	// do B
 	// do C
 	// close B
-	// close C
 }
 
 type serviceA struct{}
@@ -95,7 +56,7 @@ func (sb *serviceB) DoB() {
 	fmt.Println("do B")
 }
 
-func (sb *serviceB) close() error {
+func (sb *serviceB) close(ctx context.Context) error {
 	fmt.Println("close B")
 	return nil
 }
@@ -107,10 +68,6 @@ type serviceC struct {
 func (sc *serviceC) DoC() {
 	sc.sb()
 	fmt.Println("do C")
-}
-
-func (sc *serviceC) close() {
-	fmt.Println("close C")
 }
 
 func Test(t *testing.T) {
