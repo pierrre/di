@@ -32,7 +32,11 @@ func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err erro
 
 // MustGet calls [Get] with [Must].
 func MustGet[S any](ctx context.Context, ctn *Container, name string) S {
-	return Must(Get[S](ctx, ctn, name))
+	s, err := Get[S](ctx, ctn, name)
+	if err != nil {
+		panic(err)
+	}
+	return s
 }
 
 // GetAll returns all services of a type from a [Container].
@@ -327,14 +331,6 @@ func addDependencyToCollectorFromContext(ctx context.Context, d *Dependency) {
 	if ok {
 		dc.add(d)
 	}
-}
-
-// Must is a helper to call a function and panics if it returns an error.
-func Must[T any](v T, err error) T {
-	if err != nil {
-		panic(err)
-	}
-	return v
 }
 
 var (

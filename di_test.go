@@ -530,13 +530,3 @@ func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	err := ctn.Close(ctx)
 	assert.ErrorIs(t, err, context.Canceled)
 }
-
-func TestMust(t *testing.T) {
-	Must("", nil)
-}
-
-func TestMustPanic(t *testing.T) {
-	assert.Panics(t, func() {
-		Must("", errors.New("error"))
-	})
-}
