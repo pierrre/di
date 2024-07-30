@@ -103,9 +103,9 @@ func returnWrapServiceError(perr *error, name string) { //nolint:gocritic // We 
 }
 
 func getServiceWrapperImpl[S any](ctn *Container, name string) (swi *serviceWrapperImpl[S], err error) {
-	sw := ctn.get(name)
-	if sw == nil {
-		return nil, ErrNotSet
+	sw, err := ctn.get(name)
+	if err != nil {
+		return nil, err
 	}
 	swi, ok := sw.(*serviceWrapperImpl[S])
 	if !ok {
@@ -125,12 +125,12 @@ type Container struct {
 	getServiceNamesOrdered []string
 }
 
-func (c *Container) get(name string) serviceWrapper {
+func (c *Container) get(name string) (serviceWrapper, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	sw, ok := c.services[name]
 	if !ok {
-		return nil
+		return nil, ErrNotSet
 	}
 	if c.getServiceNames == nil {
 		c.getServiceNames = make(map[string]struct{})
@@ -140,7 +140,7 @@ func (c *Container) get(name string) serviceWrapper {
 		c.getServiceNames[name] = struct{}{}
 		c.getServiceNamesOrdered = append(c.getServiceNamesOrdered, name)
 	}
-	return sw
+	return sw, nil
 }
 
 func (c *Container) set(name string, sw serviceWrapper) {
