@@ -11,6 +11,26 @@ import (
 	"github.com/pierrre/go-libs/reflectutil"
 )
 
+// Set sets a service to a [Container].
+//
+// If the name is empty, it is set to the type of the service.
+//
+// If the service is already set, it returns [ErrAlreadySet].
+func Set[S any](ctn *Container, name string, b Builder[S]) (err error) {
+	name = getName[S](name)
+	defer returnWrapServiceError(&err, name)
+	sw := newServiceWrapperImpl(name, b)
+	return ctn.set(name, sw)
+}
+
+// MustSet calls [Set] and panics if there is an error.
+func MustSet[S any](ctn *Container, name string, b Builder[S]) {
+	err := Set[S](ctn, name, b)
+	if err != nil {
+		panic(err)
+	}
+}
+
 // Get returns a service from a [Container].
 //
 // If the name is empty, it is set to the type of the service.
@@ -75,17 +95,6 @@ func GetDependency[S any](ctx context.Context, ctn *Container, name string) (dep
 	return swi.getDependency(ctx, ctn)
 }
 
-// Set sets a service to a [Container].
-//
-// If the name is empty, it is set to the type of the service.
-//
-// If the service is already set, it panics.
-func Set[S any](ctn *Container, name string, b Builder[S]) {
-	name = getName[S](name)
-	sw := newServiceWrapperImpl(name, b)
-	ctn.set(name, sw)
-}
-
 func getName[S any](name string) string {
 	if name == "" {
 		name = reflectutil.TypeFullNameFor[S]()
@@ -125,6 +134,20 @@ type Container struct {
 	getServiceNamesOrdered []string
 }
 
+func (c *Container) set(name string, sw serviceWrapper) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.services == nil {
+		c.services = make(map[string]serviceWrapper)
+	}
+	_, ok := c.services[name]
+	if ok {
+		return ErrAlreadySet
+	}
+	c.services[name] = sw
+	return nil
+}
+
 func (c *Container) get(name string) (serviceWrapper, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -141,22 +164,6 @@ func (c *Container) get(name string) (serviceWrapper, error) {
 		c.getServiceNamesOrdered = append(c.getServiceNamesOrdered, name)
 	}
 	return sw, nil
-}
-
-func (c *Container) set(name string, sw serviceWrapper) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.services == nil {
-		c.services = make(map[string]serviceWrapper)
-	}
-	_, ok := c.services[name]
-	if ok {
-		panic(&ServiceError{
-			error: ErrAlreadySet,
-			Name:  name,
-		})
-	}
-	c.services[name] = sw
 }
 
 func (c *Container) all(f func(name string, sw serviceWrapper)) {

@@ -18,16 +18,16 @@ func Example() {
 	ctx := context.Background()
 	ctn := new(Container)
 	defer ctn.Close(ctx)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (*serviceA, Close, error) {
 		return &serviceA{}, nil, nil
 	})
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceB, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (*serviceB, Close, error) {
 		sb := &serviceB{
 			sa: MustGet[*serviceA](ctx, ctn, "").DoA,
 		}
 		return sb, sb.close, nil
 	})
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (*serviceC, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (*serviceC, Close, error) {
 		return &serviceC{
 			sb: MustGet[*serviceB](ctx, ctn, "").DoB,
 		}, nil, nil
@@ -74,10 +74,11 @@ func Test(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
 	builderCallCount := 0
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	err := Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCallCount++
 		return "test", nil, nil
 	})
+	assert.NoError(t, err)
 	sa, err := Get[string](ctx, ctn, "")
 	assert.NoError(t, err)
 	assert.NotZero(t, sa)
@@ -87,22 +88,32 @@ func Test(t *testing.T) {
 	assert.Equal(t, builderCallCount, 1)
 }
 
-func TestSetPanicAlreadySet(t *testing.T) {
+func TestSetErrorAlreadySet(t *testing.T) {
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	err := Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	rec, _ := assert.Panics(t, func() {
-		Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
-			return "", nil, nil
-		})
+	assert.NoError(t, err)
+	err = Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
 	})
-	err, _ := assert.Type[error](t, rec)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Name, "string")
 	assert.ErrorIs(t, err, ErrAlreadySet)
 	assert.ErrorEqual(t, err, "service \"string\": already set")
+}
+
+func TestMustSetPanicAlreadySet(t *testing.T) {
+	ctn := new(Container)
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
+	})
+	assert.Panics(t, func() {
+		MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+			return "", nil, nil
+		})
+	})
 }
 
 func TestGetErrorNotSet(t *testing.T) {
@@ -119,7 +130,7 @@ func TestGetErrorNotSet(t *testing.T) {
 func TestGetErrorType(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "test", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "test", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
 	_, err := Get[int](ctx, ctn, "test")
@@ -136,7 +147,7 @@ func TestGetErrorType(t *testing.T) {
 func TestGetErrorBuilder(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
 	})
 	_, err := Get[string](ctx, ctn, "")
@@ -156,21 +167,21 @@ func TestGetErrorCycle(t *testing.T) {
 
 func newTestContainerCycle() *Container {
 	ctn := new(Container)
-	Set(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		_, err := Get[string](ctx, ctn, "b")
 		if err != nil {
 			return "", nil, err
 		}
 		return "", nil, nil
 	})
-	Set(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		_, err := Get[string](ctx, ctn, "c")
 		if err != nil {
 			return "", nil, err
 		}
 		return "", nil, nil
 	})
-	Set(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		_, err := Get[string](ctx, ctn, "a")
 		if err != nil {
 			return "", nil, err
@@ -185,7 +196,7 @@ func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctn := new(Container)
 	started := make(chan struct{})
 	block := make(chan struct{})
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		close(started)
 		<-block
 		return "", nil, nil
@@ -206,7 +217,7 @@ func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 func TestMustGet(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "test", nil, nil
 	})
 	sa := MustGet[string](ctx, ctn, "")
@@ -224,10 +235,10 @@ func TestMustGetPanic(t *testing.T) {
 func TestGetAll(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	Set(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
 	ss, err := GetAll[string](ctx, ctn)
@@ -238,7 +249,7 @@ func TestGetAll(t *testing.T) {
 func TestGetAllError(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
 	})
 	_, err := GetAll[string](ctx, ctn)
@@ -251,25 +262,25 @@ func TestGetAllError(t *testing.T) {
 func ExampleDependency() {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		MustGet[string](ctx, ctn, "b")
 		MustGet[string](ctx, ctn, "c")
 		return "", nil, nil
 	})
-	Set(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		MustGet[string](ctx, ctn, "d")
 		MustGet[string](ctx, ctn, "e")
 		return "", nil, nil
 	})
-	Set(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		MustGet[string](ctx, ctn, "d")
 		MustGet[string](ctx, ctn, "e")
 		return "", nil, nil
 	})
-	Set(ctn, "d", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "d", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	Set(ctn, "e", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "e", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
 	dep, err := GetDependency[string](ctx, ctn, "a")
@@ -324,25 +335,25 @@ func ExampleDependency() {
 func TestGetDependency(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		MustGet[string](ctx, ctn, "b")
 		MustGet[string](ctx, ctn, "c")
 		return "", nil, nil
 	})
-	Set(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		MustGet[string](ctx, ctn, "d")
 		MustGet[string](ctx, ctn, "e")
 		return "", nil, nil
 	})
-	Set(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		MustGet[string](ctx, ctn, "d")
 		MustGet[string](ctx, ctn, "e")
 		return "", nil, nil
 	})
-	Set(ctn, "d", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "d", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	Set(ctn, "e", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "e", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
 	dep, err := GetDependency[string](ctx, ctn, "a")
@@ -398,7 +409,7 @@ func TestGetDependencyErrorNotSet(t *testing.T) {
 func TestGetDependencyErrorBuilder(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
 	})
 	_, err := GetDependency[string](ctx, ctn, "")
@@ -421,7 +432,7 @@ func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctn := new(Container)
 	started := make(chan struct{})
 	block := make(chan struct{})
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		close(started)
 		<-block
 		return "", nil, nil
@@ -444,7 +455,7 @@ func TestClose(t *testing.T) {
 	ctn := new(Container)
 	builderCalled := 0
 	closeCalled := 0
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCalled++
 		return "", func(ctx context.Context) error {
 			closeCalled++
@@ -466,7 +477,7 @@ func TestCloseNil(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
 	builderCalled := 0
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCalled++
 		return "", nil, nil
 	})
@@ -483,7 +494,7 @@ func TestCloseNil(t *testing.T) {
 func TestCloseNotInitialized(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
 	})
 	_, err := Get[string](ctx, ctn, "")
@@ -495,7 +506,7 @@ func TestCloseNotInitialized(t *testing.T) {
 func TestCloseError(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", func(ctx context.Context) error {
 			return errors.New("error")
 		}, nil
@@ -513,7 +524,7 @@ func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctn := new(Container)
 	started := make(chan struct{})
 	block := make(chan struct{})
-	Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		close(started)
 		<-block
 		return "", nil, nil
