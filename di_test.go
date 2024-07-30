@@ -99,7 +99,7 @@ func TestSetErrorAlreadySet(t *testing.T) {
 	})
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "string")
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorIs(t, err, ErrAlreadySet)
 	assert.ErrorEqual(t, err, "service \"string\": already set")
 }
@@ -122,26 +122,9 @@ func TestGetErrorNotSet(t *testing.T) {
 	_, err := Get[string](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "string")
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorIs(t, err, ErrNotSet)
 	assert.ErrorEqual(t, err, "service \"string\": not set")
-}
-
-func TestGetErrorType(t *testing.T) {
-	ctx := context.Background()
-	ctn := new(Container)
-	MustSet(ctn, "test", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		return "", nil, nil
-	})
-	_, err := Get[int](ctx, ctn, "test")
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "test")
-	var typeErr *TypeError
-	assert.ErrorAs(t, err, &typeErr)
-	assert.Equal(t, typeErr.Service, reflect.TypeFor[string]())
-	assert.Equal(t, typeErr.Expected, reflect.TypeFor[int]())
-	assert.ErrorEqual(t, err, "service \"test\": type string does not match the expected type int")
 }
 
 func TestGetErrorBuilder(t *testing.T) {
@@ -153,7 +136,7 @@ func TestGetErrorBuilder(t *testing.T) {
 	_, err := Get[string](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "string")
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service \"string\": error")
 }
 
@@ -162,7 +145,7 @@ func TestGetErrorCycle(t *testing.T) {
 	ctn := newTestContainerCycle()
 	_, err := Get[string](ctx, ctn, "a")
 	assert.ErrorIs(t, err, ErrCycle)
-	assert.ErrorEqual(t, err, "service \"a\": service \"b\": service \"c\": service \"a\": cycle")
+	assert.ErrorEqual(t, err, "service \"string(a)\": service \"string(b)\": service \"string(c)\": service \"string(a)\": cycle")
 }
 
 func newTestContainerCycle() *Container {
@@ -255,7 +238,7 @@ func TestGetAllError(t *testing.T) {
 	_, err := GetAll[string](ctx, ctn)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "string")
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service \"string\": error")
 }
 
@@ -297,34 +280,34 @@ func ExampleDependency() {
 	fmt.Println(buf.String())
 	// Output:
 	// {
-	// 	"name": "a",
 	// 	"type": "string",
+	// 	"name": "a",
 	// 	"dependencies": [
 	// 		{
-	// 			"name": "b",
 	// 			"type": "string",
+	// 			"name": "b",
 	// 			"dependencies": [
 	// 				{
-	// 					"name": "d",
-	// 					"type": "string"
+	// 					"type": "string",
+	// 					"name": "d"
 	// 				},
 	// 				{
-	// 					"name": "e",
-	// 					"type": "string"
+	// 					"type": "string",
+	// 					"name": "e"
 	// 				}
 	// 			]
 	// 		},
 	// 		{
-	// 			"name": "c",
 	// 			"type": "string",
+	// 			"name": "c",
 	// 			"dependencies": [
 	// 				{
-	// 					"name": "d",
-	// 					"type": "string"
+	// 					"type": "string",
+	// 					"name": "d"
 	// 				},
 	// 				{
-	// 					"name": "e",
-	// 					"type": "string"
+	// 					"type": "string",
+	// 					"name": "e"
 	// 				}
 	// 			]
 	// 		}
@@ -358,35 +341,43 @@ func TestGetDependency(t *testing.T) {
 	})
 	dep, err := GetDependency[string](ctx, ctn, "a")
 	assert.NoError(t, err)
+	assert.NotZero(t, dep.GetReflectType())
 	expected := &Dependency{
-		Name: "a",
-		Type: "string",
+		Type:        "string",
+		reflectType: reflect.TypeFor[string](),
+		Name:        "a",
 		Dependencies: []*Dependency{
 			{
-				Name: "b",
-				Type: "string",
+				Type:        "string",
+				Name:        "b",
+				reflectType: reflect.TypeFor[string](),
 				Dependencies: []*Dependency{
 					{
-						Name: "d",
-						Type: "string",
+						Type:        "string",
+						reflectType: reflect.TypeFor[string](),
+						Name:        "d",
 					},
 					{
-						Name: "e",
-						Type: "string",
+						Type:        "string",
+						reflectType: reflect.TypeFor[string](),
+						Name:        "e",
 					},
 				},
 			},
 			{
-				Name: "c",
-				Type: "string",
+				Type:        "string",
+				reflectType: reflect.TypeFor[string](),
+				Name:        "c",
 				Dependencies: []*Dependency{
 					{
-						Name: "d",
-						Type: "string",
+						Type:        "string",
+						reflectType: reflect.TypeFor[string](),
+						Name:        "d",
 					},
 					{
-						Name: "e",
-						Type: "string",
+						Type:        "string",
+						reflectType: reflect.TypeFor[string](),
+						Name:        "e",
 					},
 				},
 			},
@@ -402,7 +393,7 @@ func TestGetDependencyErrorNotSet(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNotSet)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "string")
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service \"string\": not set")
 }
 
@@ -415,7 +406,7 @@ func TestGetDependencyErrorBuilder(t *testing.T) {
 	_, err := GetDependency[string](ctx, ctn, "")
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "string")
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service \"string\": error")
 }
 
@@ -424,7 +415,7 @@ func TestGetDependencyErrorCycle(t *testing.T) {
 	ctn := newTestContainerCycle()
 	_, err := GetDependency[string](ctx, ctn, "a")
 	assert.ErrorIs(t, err, ErrCycle)
-	assert.ErrorEqual(t, err, "service \"a\": service \"b\": service \"c\": service \"a\": cycle")
+	assert.ErrorEqual(t, err, "service \"string(a)\": service \"string(b)\": service \"string(c)\": service \"string(a)\": cycle")
 }
 
 func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
@@ -516,7 +507,7 @@ func TestCloseError(t *testing.T) {
 	err = ctn.Close(ctx)
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
-	assert.Equal(t, serviceErr.Name, "string")
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
 }
 
 func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {

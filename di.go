@@ -13,14 +13,14 @@ import (
 
 // Set sets a service to a [Container].
 //
-// If the name is empty, it is set to the type of the service.
+// Name is an optional identifier amongst the services of the same type.
 //
 // If the service is already set, it returns [ErrAlreadySet].
 func Set[S any](ctn *Container, name string, b Builder[S]) (err error) {
-	name = getName[S](name)
-	defer returnWrapServiceError(&err, name)
+	key := newKey[S](name)
+	defer returnWrapServiceError(&err, key)
 	sw := newServiceWrapperImpl(name, b)
-	return ctn.set(name, sw)
+	return ctn.set(key, sw)
 }
 
 // MustSet calls [Set] and panics if there is an error.
@@ -33,17 +33,16 @@ func MustSet[S any](ctn *Container, name string, b Builder[S]) {
 
 // Get returns a service from a [Container].
 //
-// If the name is empty, it is set to the type of the service.
+// Name is an optional identifier amongst the services of the same type.
 //
-// If the service is not found for the given name, it returns an error.
+// If the service is not found, it returns [ErrNotSet].
 //
-// If the service is not of the expected type, it returns an error.
-//
-// If the service creation fails, it returns an error.
+// If the service is not yet initialized, it calls its builder.
+// If the builder fails, it returns the error.
 func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err error) {
-	name = getName[S](name)
-	defer returnWrapServiceError(&err, name)
-	swi, err := getServiceWrapperImpl[S](ctn, name)
+	key := newKey[S](name)
+	defer returnWrapServiceError(&err, key)
+	swi, err := getServiceWrapperImpl[S](ctn, key)
 	if err != nil {
 		return s, err
 	}
@@ -64,10 +63,10 @@ func MustGet[S any](ctx context.Context, ctn *Container, name string) S {
 // The key of the map is the name of the service.
 func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 	var names []string
-	ctn.all(func(name string, sw serviceWrapper) {
+	ctn.all(func(key Key, sw serviceWrapper) {
 		_, ok := sw.(*serviceWrapperImpl[S])
 		if ok {
-			names = append(names, name)
+			names = append(names, key.Name)
 		}
 	})
 	var ss map[string]S
@@ -86,91 +85,77 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 
 // GetDependency returns a service [Dependency] tree from a [Container].
 func GetDependency[S any](ctx context.Context, ctn *Container, name string) (dep *Dependency, err error) {
-	name = getName[S](name)
-	defer returnWrapServiceError(&err, name)
-	swi, err := getServiceWrapperImpl[S](ctn, name)
+	key := newKey[S](name)
+	defer returnWrapServiceError(&err, key)
+	swi, err := getServiceWrapperImpl[S](ctn, key)
 	if err != nil {
 		return nil, err
 	}
 	return swi.getDependency(ctx, ctn)
 }
 
-func getName[S any](name string) string {
-	if name == "" {
-		name = reflectutil.TypeFullNameFor[S]()
-	}
-	return name
-}
-
-func returnWrapServiceError(perr *error, name string) { //nolint:gocritic // We need a pointer of error.
+func returnWrapServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
 	if *perr != nil {
 		*perr = &ServiceError{
 			error: *perr,
-			Name:  name,
+			Key:   key,
 		}
 	}
 }
 
-func getServiceWrapperImpl[S any](ctn *Container, name string) (swi *serviceWrapperImpl[S], err error) {
-	sw, err := ctn.get(name)
+func getServiceWrapperImpl[S any](ctn *Container, key Key) (swi *serviceWrapperImpl[S], err error) {
+	sw, err := ctn.get(key)
 	if err != nil {
 		return nil, err
 	}
-	swi, ok := sw.(*serviceWrapperImpl[S])
-	if !ok {
-		return nil, &TypeError{
-			Service:  sw.getType(),
-			Expected: reflect.TypeFor[S](),
-		}
-	}
-	return swi, nil
+	return sw.(*serviceWrapperImpl[S]), nil //nolint:forcetypeassert // We know the type from the key.
 }
 
 // Container contains services.
 type Container struct {
-	mu                     sync.Mutex
-	services               map[string]serviceWrapper
-	getServiceNames        map[string]struct{}
-	getServiceNamesOrdered []string
+	mu             sync.Mutex
+	services       map[Key]serviceWrapper
+	getKeys        map[Key]struct{}
+	getKeysOrdered []Key
 }
 
-func (c *Container) set(name string, sw serviceWrapper) error {
+func (c *Container) set(key Key, sw serviceWrapper) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.services == nil {
-		c.services = make(map[string]serviceWrapper)
+		c.services = make(map[Key]serviceWrapper)
 	}
-	_, ok := c.services[name]
+	_, ok := c.services[key]
 	if ok {
 		return ErrAlreadySet
 	}
-	c.services[name] = sw
+	c.services[key] = sw
 	return nil
 }
 
-func (c *Container) get(name string) (serviceWrapper, error) {
+func (c *Container) get(key Key) (serviceWrapper, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	sw, ok := c.services[name]
+	sw, ok := c.services[key]
 	if !ok {
 		return nil, ErrNotSet
 	}
-	if c.getServiceNames == nil {
-		c.getServiceNames = make(map[string]struct{})
+	if c.getKeys == nil {
+		c.getKeys = make(map[Key]struct{})
 	}
-	_, ok = c.getServiceNames[name]
+	_, ok = c.getKeys[key]
 	if !ok {
-		c.getServiceNames[name] = struct{}{}
-		c.getServiceNamesOrdered = append(c.getServiceNamesOrdered, name)
+		c.getKeys[key] = struct{}{}
+		c.getKeysOrdered = append(c.getKeysOrdered, key)
 	}
 	return sw, nil
 }
 
-func (c *Container) all(f func(name string, sw serviceWrapper)) {
+func (c *Container) all(f func(key Key, sw serviceWrapper)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for name, sw := range c.services {
-		f(name, sw)
+	for key, sw := range c.services {
+		f(key, sw)
 	}
 }
 
@@ -184,21 +169,42 @@ func (c *Container) Close(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var errs []error
-	for i := len(c.getServiceNamesOrdered) - 1; i >= 0; i-- {
-		name := c.getServiceNamesOrdered[i]
-		sw := c.services[name]
+	for i := len(c.getKeysOrdered) - 1; i >= 0; i-- {
+		key := c.getKeysOrdered[i]
+		sw := c.services[key]
 		err := sw.close(ctx)
 		if err != nil {
 			err = &ServiceError{
 				error: err,
-				Name:  name,
+				Key:   key,
 			}
 			errs = append(errs, err)
 		}
 	}
-	c.getServiceNames = nil
-	c.getServiceNamesOrdered = nil
+	c.getKeys = nil
+	c.getKeysOrdered = nil
 	return errors.Join(errs...)
+}
+
+// Key represents a service key in a [Container].
+type Key struct {
+	Type reflect.Type
+	Name string
+}
+
+func newKey[S any](name string) Key {
+	return Key{
+		Type: reflect.TypeFor[S](),
+		Name: name,
+	}
+}
+
+func (k Key) String() string {
+	typName := reflectutil.TypeFullName(k.Type)
+	if k.Name == "" {
+		return typName
+	}
+	return fmt.Sprintf("%s(%s)", typName, k.Name)
 }
 
 // Builder builds a service.
@@ -215,7 +221,6 @@ type Close func(ctx context.Context) error
 
 type serviceWrapper interface {
 	close(ctx context.Context) error
-	getType() reflect.Type
 }
 
 type serviceWrapperImpl[S any] struct {
@@ -275,9 +280,11 @@ func (sw *serviceWrapperImpl[S]) ensureInitialized(ctx context.Context, ctn *Con
 	sw.initialized = true
 	sw.service = s
 	sw.cl = cl
+	typ := reflect.TypeFor[S]()
 	sw.dependency = &Dependency{
+		Type:         reflectutil.TypeFullName(typ),
+		reflectType:  typ,
 		Name:         sw.name,
-		Type:         reflectutil.TypeFullNameFor[S](),
 		Dependencies: dc.dependencies,
 	}
 	return nil
@@ -303,15 +310,17 @@ func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
 	return err
 }
 
-func (sw *serviceWrapperImpl[S]) getType() reflect.Type {
-	return reflect.TypeFor[S]()
-}
-
 // Dependency represents a service dependency.
 type Dependency struct {
-	Name         string        `json:"name"`
-	Type         string        `json:"type"`
+	Type         string `json:"type"`
+	reflectType  reflect.Type
+	Name         string        `json:"name,omitempty"`
 	Dependencies []*Dependency `json:"dependencies,omitempty"`
+}
+
+// GetReflectType returns the reflect.Type of the dependency.
+func (d *Dependency) GetReflectType() reflect.Type {
+	return d.reflectType
 }
 
 type dependencyCollector struct {
@@ -352,7 +361,7 @@ var (
 // ServiceError represents an error related to a service.
 type ServiceError struct {
 	error
-	Name string
+	Key Key
 }
 
 func (err *ServiceError) Unwrap() error {
@@ -360,17 +369,7 @@ func (err *ServiceError) Unwrap() error {
 }
 
 func (err *ServiceError) Error() string {
-	return fmt.Sprintf("service %q: %v", err.Name, err.error)
-}
-
-// TypeError represents an error related to a service type.
-type TypeError struct {
-	Service  reflect.Type
-	Expected reflect.Type
-}
-
-func (err *TypeError) Error() string {
-	return fmt.Sprintf("type %s does not match the expected type %s", reflectutil.TypeFullName(err.Service), reflectutil.TypeFullName(err.Expected))
+	return fmt.Sprintf("service %q: %v", err.Key, err.error)
 }
 
 type mutex struct {
