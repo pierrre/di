@@ -204,7 +204,7 @@ func (c *Container) Close(ctx context.Context) error {
 type Builder[S any] func(ctx context.Context, ctn *Container) (S, Close, error)
 
 // Close closes a service.
-type Close = func(ctx context.Context) error
+type Close func(ctx context.Context) error
 
 type serviceWrapper interface {
 	close(ctx context.Context) error
