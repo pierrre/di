@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/pierrre/assert"
@@ -531,4 +532,24 @@ func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	cancel()
 	err := ctn.Close(ctx)
 	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func BenchmarkMutex(b *testing.B) {
+	for _, n := range []int{0, 1, 2, 5, 10, 20, 50, 100} {
+		b.Run(strconv.Itoa(n), func(b *testing.B) {
+			ctx := context.Background()
+			var err error
+			for i := 0; i < n; i++ {
+				ctx, err = newMutex().lock(ctx)
+				assert.NoError(b, err)
+			}
+			b.ResetTimer()
+			mu := newMutex()
+			for i := 0; i < b.N; i++ {
+				_, err = mu.lock(ctx)
+				assert.NoError(b, err)
+				mu.unlock()
+			}
+		})
+	}
 }
