@@ -19,7 +19,9 @@ import (
 func Set[S any](ctn *Container, name string, b Builder[S]) (err error) {
 	key := newKey[S](name)
 	defer returnWrapServiceError(&err, key)
-	sw := newServiceWrapperImpl(name, b)
+	sw := newServiceWrapper(key, func(ctx context.Context, ctn *Container) (any, Close, error) {
+		return b(ctx, ctn)
+	})
 	return ctn.set(key, sw)
 }
 
@@ -42,11 +44,16 @@ func MustSet[S any](ctn *Container, name string, b Builder[S]) {
 func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err error) {
 	key := newKey[S](name)
 	defer returnWrapServiceError(&err, key)
-	swi, err := getServiceWrapperImpl[S](ctn, key)
+	sw, err := ctn.get(key)
 	if err != nil {
 		return s, err
 	}
-	return swi.get(ctx, ctn)
+	v, err := sw.get(ctx, ctn)
+	if err != nil {
+		return s, err
+	}
+	s = v.(S) //nolint:forcetypeassert // We know the type.
+	return s, nil
 }
 
 // MustGet calls [Get] and panics if there is an error.
@@ -63,9 +70,9 @@ func MustGet[S any](ctx context.Context, ctn *Container, name string) S {
 // The key of the map is the name of the service.
 func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 	var names []string
-	ctn.all(func(key Key, sw serviceWrapper) {
-		_, ok := sw.(*serviceWrapperImpl[S])
-		if ok {
+	typ := reflect.TypeFor[S]()
+	ctn.all(func(key Key, sw *serviceWrapper) {
+		if sw.key.Type == typ {
 			names = append(names, key.Name)
 		}
 	})
@@ -87,11 +94,11 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 func GetDependency[S any](ctx context.Context, ctn *Container, name string) (dep *Dependency, err error) {
 	key := newKey[S](name)
 	defer returnWrapServiceError(&err, key)
-	swi, err := getServiceWrapperImpl[S](ctn, key)
+	sw, err := ctn.get(key)
 	if err != nil {
 		return nil, err
 	}
-	return swi.getDependency(ctx, ctn)
+	return sw.getDependency(ctx, ctn)
 }
 
 func returnWrapServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
@@ -103,25 +110,17 @@ func returnWrapServiceError(perr *error, key Key) { //nolint:gocritic // We need
 	}
 }
 
-func getServiceWrapperImpl[S any](ctn *Container, key Key) (swi *serviceWrapperImpl[S], err error) {
-	sw, err := ctn.get(key)
-	if err != nil {
-		return nil, err
-	}
-	return sw.(*serviceWrapperImpl[S]), nil //nolint:forcetypeassert // We know the type from the key.
-}
-
 // Container contains services.
 type Container struct {
 	mu       sync.Mutex
-	services map[Key]serviceWrapper
+	services map[Key]*serviceWrapper
 }
 
-func (c *Container) set(key Key, sw serviceWrapper) error {
+func (c *Container) set(key Key, sw *serviceWrapper) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.services == nil {
-		c.services = make(map[Key]serviceWrapper)
+		c.services = make(map[Key]*serviceWrapper)
 	}
 	_, ok := c.services[key]
 	if ok {
@@ -131,7 +130,7 @@ func (c *Container) set(key Key, sw serviceWrapper) error {
 	return nil
 }
 
-func (c *Container) get(key Key) (serviceWrapper, error) {
+func (c *Container) get(key Key) (*serviceWrapper, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	sw, ok := c.services[key]
@@ -141,7 +140,7 @@ func (c *Container) get(key Key) (serviceWrapper, error) {
 	return sw, nil
 }
 
-func (c *Container) all(f func(key Key, sw serviceWrapper)) {
+func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for key, sw := range c.services {
@@ -201,46 +200,44 @@ func (k Key) String() string {
 // If it calls [Get] it must provide the same [context.Context].
 type Builder[S any] func(ctx context.Context, ctn *Container) (S, Close, error)
 
+type builder func(ctx context.Context, ctn *Container) (any, Close, error)
+
 // Close closes a service.
 type Close func(ctx context.Context) error
 
-type serviceWrapper interface {
-	close(ctx context.Context) error
-}
-
-type serviceWrapperImpl[S any] struct {
+type serviceWrapper struct {
 	mu          *mutex
-	name        string
-	builder     Builder[S]
+	key         Key
+	builder     builder
 	initialized bool
-	service     S
+	service     any
 	cl          Close
 	dependency  *Dependency
 }
 
-func newServiceWrapperImpl[S any](name string, builder Builder[S]) *serviceWrapperImpl[S] {
-	return &serviceWrapperImpl[S]{
+func newServiceWrapper(key Key, b builder) *serviceWrapper {
+	return &serviceWrapper{
 		mu:      newMutex(),
-		name:    name,
-		builder: builder,
+		key:     key,
+		builder: b,
 	}
 }
 
-func (sw *serviceWrapperImpl[S]) get(ctx context.Context, ctn *Container) (S, error) {
+func (sw *serviceWrapper) get(ctx context.Context, ctn *Container) (any, error) {
 	ctx, err := sw.mu.lock(ctx)
 	if err != nil {
-		return sw.service, err
+		return nil, err
 	}
 	defer sw.mu.unlock()
 	err = sw.ensureInitialized(ctx, ctn)
 	if err != nil {
-		return sw.service, err
+		return nil, err
 	}
 	addDependencyToCollectorFromContext(ctx, sw.dependency)
 	return sw.service, nil
 }
 
-func (sw *serviceWrapperImpl[S]) getDependency(ctx context.Context, ctn *Container) (*Dependency, error) {
+func (sw *serviceWrapper) getDependency(ctx context.Context, ctn *Container) (*Dependency, error) {
 	ctx, err := sw.mu.lock(ctx)
 	if err != nil {
 		return nil, err
@@ -253,7 +250,7 @@ func (sw *serviceWrapperImpl[S]) getDependency(ctx context.Context, ctn *Contain
 	return sw.dependency, nil
 }
 
-func (sw *serviceWrapperImpl[S]) ensureInitialized(ctx context.Context, ctn *Container) error {
+func (sw *serviceWrapper) ensureInitialized(ctx context.Context, ctn *Container) error {
 	if sw.initialized {
 		return nil
 	}
@@ -265,17 +262,16 @@ func (sw *serviceWrapperImpl[S]) ensureInitialized(ctx context.Context, ctn *Con
 	sw.initialized = true
 	sw.service = s
 	sw.cl = cl
-	typ := reflect.TypeFor[S]()
 	sw.dependency = &Dependency{
-		Type:         reflectutil.TypeFullName(typ),
-		reflectType:  typ,
-		Name:         sw.name,
+		Type:         reflectutil.TypeFullName(sw.key.Type),
+		reflectType:  sw.key.Type,
+		Name:         sw.key.Name,
 		Dependencies: dc.dependencies,
 	}
 	return nil
 }
 
-func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
+func (sw *serviceWrapper) close(ctx context.Context) error {
 	ctx, err := sw.mu.lock(ctx)
 	if err != nil {
 		return err
@@ -288,8 +284,7 @@ func (sw *serviceWrapperImpl[S]) close(ctx context.Context) error {
 		err = sw.cl(ctx)
 	}
 	sw.initialized = false
-	var zero S
-	sw.service = zero
+	sw.service = nil
 	sw.cl = nil
 	sw.dependency = nil
 	return err
