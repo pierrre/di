@@ -113,10 +113,8 @@ func getServiceWrapperImpl[S any](ctn *Container, key Key) (swi *serviceWrapperI
 
 // Container contains services.
 type Container struct {
-	mu             sync.Mutex
-	services       map[Key]serviceWrapper
-	getKeys        map[Key]struct{}
-	getKeysOrdered []Key
+	mu       sync.Mutex
+	services map[Key]serviceWrapper
 }
 
 func (c *Container) set(key Key, sw serviceWrapper) error {
@@ -140,14 +138,6 @@ func (c *Container) get(key Key) (serviceWrapper, error) {
 	if !ok {
 		return nil, ErrNotSet
 	}
-	if c.getKeys == nil {
-		c.getKeys = make(map[Key]struct{})
-	}
-	_, ok = c.getKeys[key]
-	if !ok {
-		c.getKeys[key] = struct{}{}
-		c.getKeysOrdered = append(c.getKeysOrdered, key)
-	}
 	return sw, nil
 }
 
@@ -159,9 +149,8 @@ func (c *Container) all(f func(key Key, sw serviceWrapper)) {
 	}
 }
 
-// Close closes the [Container].
+// Close closes the [Container] and all the service.
 //
-// It closes all services in reverse dependency order.
 // The created services must not be used after this call.
 //
 // The container can be reused after this call.
@@ -169,9 +158,7 @@ func (c *Container) Close(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var errs []error
-	for i := len(c.getKeysOrdered) - 1; i >= 0; i-- {
-		key := c.getKeysOrdered[i]
-		sw := c.services[key]
+	for key, sw := range c.services {
 		err := sw.close(ctx)
 		if err != nil {
 			err = &ServiceError{
@@ -181,8 +168,6 @@ func (c *Container) Close(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
-	c.getKeys = nil
-	c.getKeysOrdered = nil
 	return errors.Join(errs...)
 }
 
