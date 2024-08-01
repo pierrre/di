@@ -216,6 +216,18 @@ func TestMustGetPanic(t *testing.T) {
 	})
 }
 
+func BenchmarkGet(b *testing.B) {
+	ctx := context.Background()
+	ctn := new(Container)
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
+	})
+	for i := 0; i < b.N; i++ {
+		_, err := Get[string](ctx, ctn, "")
+		assert.NoError(b, err)
+	}
+}
+
 func TestGetAll(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
