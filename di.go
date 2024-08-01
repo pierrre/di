@@ -148,7 +148,7 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 	}
 }
 
-// Close closes the [Container] and all the service.
+// Close closes the [Container] and all the services.
 //
 // The created services must not be used after this call.
 //

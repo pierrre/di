@@ -8,11 +8,11 @@ Simple Go depency injection container with generics.
 
 - Set and get services to a container
 - Lazy service instantiation
-- Optional custom service names
-- Close services in reverse dependency order
-- Type safe, no reflection or unsafe (uses generics)
-- [Dependency graph](https://pkg.go.dev/github.com/pierrre/di#example-Dependency)
+- Optional service name
+- Close all initialized services
+- Type safe (uses generics)
 - Detect dependency cycle (error)
+- [Dependency graph](https://pkg.go.dev/github.com/pierrre/di#example-Dependency)
 
 ## Usage
 
