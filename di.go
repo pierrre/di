@@ -18,11 +18,9 @@ import (
 // If the service is already set, it returns [ErrAlreadySet].
 func Set[S any](ctn *Container, name string, b Builder[S]) (err error) {
 	key := newKey[S](name)
-	defer returnWrapServiceError(&err, key)
-	sw := newServiceWrapper(key, func(ctx context.Context, ctn *Container) (any, Close, error) {
+	return ctn.set(key, func(ctx context.Context, ctn *Container) (any, Close, error) {
 		return b(ctx, ctn)
 	})
-	return ctn.set(key, sw)
 }
 
 // MustSet calls [Set] and panics if there is an error.
@@ -43,12 +41,7 @@ func MustSet[S any](ctn *Container, name string, b Builder[S]) {
 // If the builder fails, it returns the error.
 func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err error) {
 	key := newKey[S](name)
-	defer returnWrapServiceError(&err, key)
-	sw, err := ctn.get(key)
-	if err != nil {
-		return s, err
-	}
-	v, err := sw.get(ctx, ctn)
+	v, err := ctn.get(ctx, key)
 	if err != nil {
 		return s, err
 	}
@@ -93,21 +86,7 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 // GetDependency returns a service [Dependency] tree from a [Container].
 func GetDependency[S any](ctx context.Context, ctn *Container, name string) (dep *Dependency, err error) {
 	key := newKey[S](name)
-	defer returnWrapServiceError(&err, key)
-	sw, err := ctn.get(key)
-	if err != nil {
-		return nil, err
-	}
-	return sw.getDependency(ctx, ctn)
-}
-
-func returnWrapServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
-	if *perr != nil {
-		*perr = &ServiceError{
-			error: *perr,
-			Key:   key,
-		}
-	}
+	return ctn.getDependency(ctx, key)
 }
 
 // Container contains services.
@@ -116,7 +95,13 @@ type Container struct {
 	services map[Key]*serviceWrapper
 }
 
-func (c *Container) set(key Key, sw *serviceWrapper) error {
+func (c *Container) set(key Key, b builder) (err error) {
+	defer returnWrapServiceError(&err, key)
+	sw := newServiceWrapper(key, b)
+	return c.setServiceWrapper(key, sw)
+}
+
+func (c *Container) setServiceWrapper(key Key, sw *serviceWrapper) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.services == nil {
@@ -130,7 +115,16 @@ func (c *Container) set(key Key, sw *serviceWrapper) error {
 	return nil
 }
 
-func (c *Container) get(key Key) (*serviceWrapper, error) {
+func (c *Container) get(ctx context.Context, key Key) (v any, err error) {
+	defer returnWrapServiceError(&err, key)
+	sw, err := c.getServiceWrapper(key)
+	if err != nil {
+		return nil, err
+	}
+	return sw.get(ctx, c)
+}
+
+func (c *Container) getServiceWrapper(key Key) (*serviceWrapper, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	sw, ok := c.services[key]
@@ -138,6 +132,15 @@ func (c *Container) get(key Key) (*serviceWrapper, error) {
 		return nil, ErrNotSet
 	}
 	return sw, nil
+}
+
+func (c *Container) getDependency(ctx context.Context, key Key) (d *Dependency, err error) {
+	defer returnWrapServiceError(&err, key)
+	sw, err := c.getServiceWrapper(key)
+	if err != nil {
+		return nil, err
+	}
+	return sw.getDependency(ctx, c)
 }
 
 func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
@@ -350,6 +353,15 @@ func (err *ServiceError) Unwrap() error {
 
 func (err *ServiceError) Error() string {
 	return fmt.Sprintf("service %q: %v", err.Key, err.error)
+}
+
+func returnWrapServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
+	if *perr != nil {
+		*perr = &ServiceError{
+			error: *perr,
+			Key:   key,
+		}
+	}
 }
 
 type mutex struct {
