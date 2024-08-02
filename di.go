@@ -91,52 +91,27 @@ func GetDependency[S any](ctx context.Context, ctn *Container, name string) (dep
 
 // Container contains services.
 type Container struct {
-	mu       sync.Mutex
-	services map[Key]*serviceWrapper
+	services serviceWrapperMap
 }
 
 func (c *Container) set(key Key, b builder) (err error) {
 	defer returnWrapServiceError(&err, key)
 	sw := newServiceWrapper(key, b)
-	return c.setServiceWrapper(key, sw)
-}
-
-func (c *Container) setServiceWrapper(key Key, sw *serviceWrapper) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.services == nil {
-		c.services = make(map[Key]*serviceWrapper)
-	}
-	_, ok := c.services[key]
-	if ok {
-		return ErrAlreadySet
-	}
-	c.services[key] = sw
-	return nil
+	return c.services.set(key, sw)
 }
 
 func (c *Container) get(ctx context.Context, key Key) (v any, err error) {
 	defer returnWrapServiceError(&err, key)
-	sw, err := c.getServiceWrapper(key)
+	sw, err := c.services.get(key)
 	if err != nil {
 		return nil, err
 	}
 	return sw.get(ctx, c)
 }
 
-func (c *Container) getServiceWrapper(key Key) (*serviceWrapper, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	sw, ok := c.services[key]
-	if !ok {
-		return nil, ErrNotSet
-	}
-	return sw, nil
-}
-
 func (c *Container) getDependency(ctx context.Context, key Key) (d *Dependency, err error) {
 	defer returnWrapServiceError(&err, key)
-	sw, err := c.getServiceWrapper(key)
+	sw, err := c.services.get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -144,11 +119,7 @@ func (c *Container) getDependency(ctx context.Context, key Key) (d *Dependency, 
 }
 
 func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for key, sw := range c.services {
-		f(key, sw)
-	}
+	c.services.all(f)
 }
 
 // Close closes the [Container] and all the services.
@@ -157,10 +128,8 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 //
 // The container can be reused after this call.
 func (c *Container) Close(ctx context.Context) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	var errs []error
-	for key, sw := range c.services {
+	c.all(func(key Key, sw *serviceWrapper) {
 		err := sw.close(ctx)
 		if err != nil {
 			err = &ServiceError{
@@ -169,7 +138,7 @@ func (c *Container) Close(ctx context.Context) error {
 			}
 			errs = append(errs, err)
 		}
-	}
+	})
 	return errors.Join(errs...)
 }
 
@@ -291,6 +260,43 @@ func (sw *serviceWrapper) close(ctx context.Context) error {
 	sw.cl = nil
 	sw.dependency = nil
 	return err
+}
+
+type serviceWrapperMap struct {
+	mu sync.Mutex
+	m  map[Key]*serviceWrapper
+}
+
+func (m *serviceWrapperMap) set(key Key, sw *serviceWrapper) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.m == nil {
+		m.m = make(map[Key]*serviceWrapper)
+	}
+	_, ok := m.m[key]
+	if ok {
+		return ErrAlreadySet
+	}
+	m.m[key] = sw
+	return nil
+}
+
+func (m *serviceWrapperMap) get(key Key) (*serviceWrapper, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sw, ok := m.m[key]
+	if !ok {
+		return nil, ErrNotSet
+	}
+	return sw, nil
+}
+
+func (m *serviceWrapperMap) all(f func(key Key, sw *serviceWrapper)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for key, sw := range m.m {
+		f(key, sw)
+	}
 }
 
 // Dependency represents a service dependency.
