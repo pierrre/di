@@ -10,7 +10,7 @@ func SetProvider[S any](ctn *Container, name string) error {
 	return Set(ctn, name, newProviderBuilder[S](name))
 }
 
-// MustSetProvider calls [SetProvider] and panics if there is an error.
+// MustSetProvider calls [MustSet] for a [Provider].
 func MustSetProvider[S any](ctn *Container, name string) {
 	MustSet(ctn, name, newProviderBuilder[S](name))
 }
@@ -27,7 +27,7 @@ func GetProvider[S any](ctx context.Context, ctn *Container, name string) (*Prov
 	return Get[*Provider[S]](ctx, ctn, name)
 }
 
-// MustGetProvider calls [GetProvider] and panics if there is an error.
+// MustGetProvider calls [MustGet] for a [Provider].
 func MustGetProvider[S any](ctx context.Context, ctn *Container, name string) *Provider[S] {
 	return MustGet[*Provider[S]](ctx, ctn, name)
 }
