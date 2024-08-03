@@ -48,7 +48,7 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 //
 // The created services must not be used after this call.
 //
-// The container can be reused after this call.
+// The [Container] can be used again after being closed.
 func (c *Container) Close(ctx context.Context) error {
 	sws := c.services.getValues()
 	slices.SortFunc(sws, func(a, b *serviceWrapper) int {
