@@ -186,8 +186,7 @@ func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 		return "", nil, nil
 	})
 	wait := goroutine.Wait(ctx, func(ctx context.Context) {
-		_, err := Get[string](ctx, ctn, "")
-		assert.NoError(t, err)
+		MustGet[string](ctx, ctn, "")
 	})
 	defer wait()
 	defer close(block)
@@ -442,8 +441,7 @@ func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 		return "", nil, nil
 	})
 	wait := goroutine.Wait(ctx, func(ctx context.Context) {
-		_, err := Get[string](ctx, ctn, "")
-		assert.NoError(t, err)
+		MustGet[string](ctx, ctn, "")
 	})
 	defer wait()
 	defer close(block)
