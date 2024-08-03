@@ -132,10 +132,7 @@ func (c *Container) Close(ctx context.Context) error {
 	c.all(func(key Key, sw *serviceWrapper) {
 		err := sw.close(ctx)
 		if err != nil {
-			err = &ServiceError{
-				error: err,
-				Key:   key,
-			}
+			err = wrapServiceError(err, key)
 			errs = append(errs, err)
 		}
 	})
@@ -361,13 +358,19 @@ func (err *ServiceError) Error() string {
 	return fmt.Sprintf("service %q: %v", err.Key, err.error)
 }
 
-func returnWrapServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
-	if *perr != nil {
-		*perr = &ServiceError{
-			error: *perr,
-			Key:   key,
-		}
+func wrapServiceError(err error, key Key) error {
+	if err == nil {
+		return nil
 	}
+	return &ServiceError{
+		error: err,
+		Key:   key,
+	}
+}
+
+func returnWrapServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
+	err := *perr
+	*perr = wrapServiceError(err, key)
 }
 
 type mutex struct {
