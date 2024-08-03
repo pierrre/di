@@ -477,6 +477,26 @@ func TestClose(t *testing.T) {
 	assert.Equal(t, closeCalled, count)
 }
 
+func TestCloseOrder(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	count := 5
+	var closeCalls []int
+	for i := range count {
+		name := fmt.Sprintf("%05d", i)
+		MustSet(ctn, name, func(ctx context.Context, ctn *Container) (string, Close, error) {
+			return "", func(ctx context.Context) error {
+				closeCalls = append(closeCalls, i)
+				return nil
+			}, nil
+		})
+		MustGet[string](ctx, ctn, name)
+	}
+	err := ctn.Close(ctx)
+	assert.NoError(t, err)
+	assert.DeepEqual(t, closeCalls, []int{0, 1, 2, 3, 4})
+}
+
 func TestCloseNil(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)

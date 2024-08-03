@@ -2,10 +2,12 @@
 package di
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sync"
 
 	"github.com/pierrre/go-libs/reflectutil"
@@ -122,20 +124,27 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 	c.services.all(f)
 }
 
-// Close closes the [Container] and all the services.
+// Close closes all the services of the [Container].
 //
 // The created services must not be used after this call.
 //
 // The container can be reused after this call.
 func (c *Container) Close(ctx context.Context) error {
-	var errs []error
+	var sws []*serviceWrapper
 	c.all(func(key Key, sw *serviceWrapper) {
+		sws = append(sws, sw)
+	})
+	slices.SortFunc(sws, func(a, b *serviceWrapper) int {
+		return cmp.Compare(a.key.String(), b.key.String())
+	})
+	var errs []error
+	for _, sw := range sws {
 		err := sw.close(ctx)
 		if err != nil {
-			err = wrapServiceError(err, key)
+			err = wrapServiceError(err, sw.key)
 			errs = append(errs, err)
 		}
-	})
+	}
 	return errors.Join(errs...)
 }
 
