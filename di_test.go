@@ -223,7 +223,7 @@ func BenchmarkGet(b *testing.B) {
 		return "", nil, nil
 	})
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		_, _ = Get[string](ctx, ctn, "")
 	}
 }
@@ -467,7 +467,7 @@ func TestClose(t *testing.T) {
 		}, nil
 	})
 	count := 5
-	for i := 0; i < count; i++ {
+	for range count {
 		_, err := Get[string](ctx, ctn, "")
 		assert.NoError(t, err)
 		err = ctn.Close(ctx)
@@ -506,7 +506,7 @@ func TestCloseNil(t *testing.T) {
 		return "", nil, nil
 	})
 	count := 5
-	for i := 0; i < count; i++ {
+	for range count {
 		_, err := Get[string](ctx, ctn, "")
 		assert.NoError(t, err)
 		err = ctn.Close(ctx)
@@ -571,13 +571,13 @@ func BenchmarkMutex(b *testing.B) {
 		b.Run(strconv.Itoa(n), func(b *testing.B) {
 			ctx := context.Background()
 			var err error
-			for i := 0; i < n; i++ {
+			for range n {
 				ctx, err = newMutex().lock(ctx)
 				assert.NoError(b, err)
 			}
 			b.ResetTimer()
 			mu := newMutex()
-			for i := 0; i < b.N; i++ {
+			for range b.N {
 				_, _ = mu.lock(ctx)
 				mu.unlock()
 			}
