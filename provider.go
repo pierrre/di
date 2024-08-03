@@ -35,13 +35,13 @@ func MustGetProvider[S any](ctx context.Context, ctn *Container, name string) *P
 // Provider provides a service.
 //
 // It can be used to break circular dependencies.
-type Provider[T any] struct {
+type Provider[S any] struct {
 	Container *Container
 	Name      string
 
 	mu          sync.Mutex
 	initialized bool
-	service     T
+	service     S
 }
 
 func newProvider[S any](ctn *Container, name string) *Provider[S] {
@@ -52,13 +52,13 @@ func newProvider[S any](ctn *Container, name string) *Provider[S] {
 }
 
 // Get returns the service.
-func (p *Provider[T]) Get(ctx context.Context) (T, error) {
+func (p *Provider[S]) Get(ctx context.Context) (S, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.initialized {
 		return p.service, nil
 	}
-	s, err := Get[T](ctx, p.Container, p.Name)
+	s, err := Get[S](ctx, p.Container, p.Name)
 	if err != nil {
 		return s, err
 	}
@@ -68,7 +68,7 @@ func (p *Provider[T]) Get(ctx context.Context) (T, error) {
 }
 
 // MustGet calls [Provider.Get] and panics if there is an error.
-func (p *Provider[T]) MustGet(ctx context.Context) T {
+func (p *Provider[S]) MustGet(ctx context.Context) S {
 	s, err := p.Get(ctx)
 	if err != nil {
 		panic(err)
@@ -81,12 +81,12 @@ func (p *Provider[T]) MustGet(ctx context.Context) T {
 // It doesn't close the service.
 //
 // The [Provider] can be used again after being closed.
-func (p *Provider[T]) Close(ctx context.Context) error {
+func (p *Provider[S]) Close(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.initialized {
 		p.initialized = false
-		var zero T
+		var zero S
 		p.service = zero
 	}
 	return nil
