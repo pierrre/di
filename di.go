@@ -95,13 +95,13 @@ type Container struct {
 }
 
 func (c *Container) set(key Key, b builder) (err error) {
-	defer returnWrapServiceError(&err, key)
+	defer wrapReturnServiceError(&err, key)
 	sw := newServiceWrapper(key, b)
 	return c.services.set(key, sw)
 }
 
 func (c *Container) get(ctx context.Context, key Key) (v any, err error) {
-	defer returnWrapServiceError(&err, key)
+	defer wrapReturnServiceError(&err, key)
 	sw, err := c.services.get(key)
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func (c *Container) get(ctx context.Context, key Key) (v any, err error) {
 }
 
 func (c *Container) getDependency(ctx context.Context, key Key) (d *Dependency, err error) {
-	defer returnWrapServiceError(&err, key)
+	defer wrapReturnServiceError(&err, key)
 	sw, err := c.services.get(key)
 	if err != nil {
 		return nil, err
@@ -368,7 +368,7 @@ func wrapServiceError(err error, key Key) error {
 	}
 }
 
-func returnWrapServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
+func wrapReturnServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
 	err := *perr
 	*perr = wrapServiceError(err, key)
 }
