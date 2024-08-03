@@ -12,6 +12,7 @@ Simple Go depency injection container with generics.
 - Close all initialized services
 - Type safe (uses generics)
 - Detect dependency cycle (error)
+- [Service provider](https://pkg.go.dev/github.com/pierrre/di#example-Provider) (helps to break circular dependencies)
 - [Dependency graph](https://pkg.go.dev/github.com/pierrre/di#example-Dependency)
 
 ## Usage
