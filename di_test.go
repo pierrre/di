@@ -222,9 +222,9 @@ func BenchmarkGet(b *testing.B) {
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := Get[string](ctx, ctn, "")
-		assert.NoError(b, err)
+		_, _ = Get[string](ctx, ctn, "")
 	}
 }
 
@@ -578,8 +578,7 @@ func BenchmarkMutex(b *testing.B) {
 			b.ResetTimer()
 			mu := newMutex()
 			for i := 0; i < b.N; i++ {
-				_, err = mu.lock(ctx)
-				assert.NoError(b, err)
+				_, _ = mu.lock(ctx)
 				mu.unlock()
 			}
 		})
