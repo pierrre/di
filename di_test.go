@@ -543,7 +543,7 @@ func TestCloseError(t *testing.T) {
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 }
 
-func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
+func TestCloseErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctx := context.Background()
 	ctn := new(Container)
 	started := make(chan struct{})
@@ -554,8 +554,7 @@ func TestCloseDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 		return "", nil, nil
 	})
 	wait := goroutine.Wait(ctx, func(ctx context.Context) {
-		_, err := Get[string](ctx, ctn, "")
-		assert.NoError(t, err)
+		_ = MustGet[string](ctx, ctn, "")
 	})
 	defer wait()
 	defer close(block)
