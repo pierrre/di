@@ -130,10 +130,7 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 //
 // The container can be reused after this call.
 func (c *Container) Close(ctx context.Context) error {
-	var sws []*serviceWrapper
-	c.all(func(key Key, sw *serviceWrapper) {
-		sws = append(sws, sw)
-	})
+	sws := c.services.getValues()
 	slices.SortFunc(sws, func(a, b *serviceWrapper) int {
 		return cmp.Compare(a.key.String(), b.key.String())
 	})
@@ -303,6 +300,16 @@ func (m *serviceWrapperMap) all(f func(key Key, sw *serviceWrapper)) {
 	for key, sw := range m.m {
 		f(key, sw)
 	}
+}
+
+func (m *serviceWrapperMap) getValues() []*serviceWrapper {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sws := make([]*serviceWrapper, 0, len(m.m))
+	for _, sw := range m.m {
+		sws = append(sws, sw)
+	}
+	return sws
 }
 
 // Dependency represents a service dependency.
