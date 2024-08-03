@@ -54,7 +54,8 @@ func (sw *serviceWrapper) getDependency(ctx context.Context, ctn *Container) (*D
 	return sw.dependency, nil
 }
 
-func (sw *serviceWrapper) ensureInitialized(ctx context.Context, ctn *Container) error {
+func (sw *serviceWrapper) ensureInitialized(ctx context.Context, ctn *Container) (err error) {
+	defer recoverPanicToError(&err)
 	if sw.initialized {
 		return nil
 	}

@@ -151,6 +151,42 @@ func TestGetErrorBuilder(t *testing.T) {
 	assert.ErrorEqual(t, err, "service \"string\": error")
 }
 
+func TestGetErrorPanic(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	e := errors.New("error")
+	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		panic(e)
+	})
+	_, err := Get[string](ctx, ctn, "")
+	var serviceErr *ServiceError
+	assert.ErrorAs(t, err, &serviceErr)
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
+	var panicErr *PanicError
+	assert.ErrorAs(t, err, &panicErr)
+	assert.Equal(t, panicErr.Recovered, any(e))
+	assert.ErrorIs(t, err, e)
+	assert.ErrorEqual(t, err, "service \"string\": panic: error")
+}
+
+func TestGetErrorPanicChain(t *testing.T) {
+	ctx := context.Background()
+	ctn := new(Container)
+	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "b")
+		return "", nil, nil
+	})
+	MustSet(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		MustGet[string](ctx, ctn, "c")
+		return "", nil, nil
+	})
+	MustSet(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		panic("test")
+	})
+	_, err := Get[string](ctx, ctn, "a")
+	assert.ErrorEqual(t, err, "service \"string(a)\": panic: service \"string(b)\": panic: service \"string(c)\": panic: test")
+}
+
 func TestGetErrorCycle(t *testing.T) {
 	ctx := context.Background()
 	ctn := newTestContainerCycle()

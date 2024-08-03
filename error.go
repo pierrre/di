@@ -42,3 +42,26 @@ func wrapReturnServiceError(perr *error, key Key) { //nolint:gocritic // We need
 	err := *perr
 	*perr = wrapServiceError(err, key)
 }
+
+// PanicError represents a recovered panic error.
+type PanicError struct {
+	Recovered any
+}
+
+func (err *PanicError) Error() string {
+	return fmt.Sprintf("panic: %v", err.Recovered)
+}
+
+func (err *PanicError) Unwrap() error {
+	errw, _ := err.Recovered.(error)
+	return errw
+}
+
+func recoverPanicToError(perr *error) { //nolint:gocritic // We need a pointer of error.
+	r := recover()
+	if r != nil {
+		*perr = &PanicError{
+			Recovered: r,
+		}
+	}
+}
