@@ -112,7 +112,7 @@ func TestSetErrorAlreadySet(t *testing.T) {
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorIs(t, err, ErrAlreadySet)
-	assert.ErrorEqual(t, err, "service \"string\": already set")
+	assert.ErrorEqual(t, err, "service string: already set")
 }
 
 func TestMustSetPanicAlreadySet(t *testing.T) {
@@ -135,7 +135,7 @@ func TestGetErrorNotSet(t *testing.T) {
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorIs(t, err, ErrNotSet)
-	assert.ErrorEqual(t, err, "service \"string\": not set")
+	assert.ErrorEqual(t, err, "service string: not set")
 }
 
 func TestGetErrorBuilder(t *testing.T) {
@@ -148,7 +148,7 @@ func TestGetErrorBuilder(t *testing.T) {
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
-	assert.ErrorEqual(t, err, "service \"string\": error")
+	assert.ErrorEqual(t, err, "service string: error")
 }
 
 func TestGetErrorPanic(t *testing.T) {
@@ -166,7 +166,7 @@ func TestGetErrorPanic(t *testing.T) {
 	assert.ErrorAs(t, err, &panicErr)
 	assert.Equal(t, panicErr.Recovered, any(e))
 	assert.ErrorIs(t, err, e)
-	assert.ErrorEqual(t, err, "service \"string\": panic: error")
+	assert.ErrorEqual(t, err, "service string: panic: error")
 }
 
 func TestGetErrorPanicChain(t *testing.T) {
@@ -184,7 +184,7 @@ func TestGetErrorPanicChain(t *testing.T) {
 		panic("test")
 	})
 	_, err := Get[string](ctx, ctn, "a")
-	assert.ErrorEqual(t, err, "service \"string(a)\": panic: service \"string(b)\": panic: service \"string(c)\": panic: test")
+	assert.ErrorEqual(t, err, "service string(a): panic: service string(b): panic: service string(c): panic: test")
 }
 
 func TestGetErrorCycle(t *testing.T) {
@@ -192,7 +192,7 @@ func TestGetErrorCycle(t *testing.T) {
 	ctn := newTestContainerCycle()
 	_, err := Get[string](ctx, ctn, "a")
 	assert.ErrorIs(t, err, ErrCycle)
-	assert.ErrorEqual(t, err, "service \"string(a)\": service \"string(b)\": service \"string(c)\": service \"string(a)\": cycle")
+	assert.ErrorEqual(t, err, "service string(a): service string(b): service string(c): service string(a): cycle")
 }
 
 func newTestContainerCycle() *Container {
@@ -297,5 +297,5 @@ func TestGetAllError(t *testing.T) {
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
-	assert.ErrorEqual(t, err, "service \"string\": error")
+	assert.ErrorEqual(t, err, "service string: error")
 }

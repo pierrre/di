@@ -81,7 +81,7 @@ func TestProviderGetError(t *testing.T) {
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorIs(t, err, ErrNotSet)
-	assert.ErrorEqual(t, err, "service \"string\": not set")
+	assert.ErrorEqual(t, err, "service string: not set")
 }
 
 func TestProviderMustGetPanic(t *testing.T) {

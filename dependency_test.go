@@ -165,7 +165,7 @@ func TestGetDependencyErrorNotSet(t *testing.T) {
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
-	assert.ErrorEqual(t, err, "service \"string\": not set")
+	assert.ErrorEqual(t, err, "service string: not set")
 }
 
 func TestGetDependencyErrorBuilder(t *testing.T) {
@@ -178,7 +178,7 @@ func TestGetDependencyErrorBuilder(t *testing.T) {
 	var serviceErr *ServiceError
 	assert.ErrorAs(t, err, &serviceErr)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
-	assert.ErrorEqual(t, err, "service \"string\": error")
+	assert.ErrorEqual(t, err, "service string: error")
 }
 
 func TestGetDependencyErrorCycle(t *testing.T) {
@@ -186,7 +186,7 @@ func TestGetDependencyErrorCycle(t *testing.T) {
 	ctn := newTestContainerCycle()
 	_, err := GetDependency[string](ctx, ctn, "a")
 	assert.ErrorIs(t, err, ErrCycle)
-	assert.ErrorEqual(t, err, "service \"string(a)\": service \"string(b)\": service \"string(c)\": service \"string(a)\": cycle")
+	assert.ErrorEqual(t, err, "service string(a): service string(b): service string(c): service string(a): cycle")
 }
 
 func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {

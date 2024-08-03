@@ -25,7 +25,7 @@ func (err *ServiceError) Unwrap() error {
 }
 
 func (err *ServiceError) Error() string {
-	return fmt.Sprintf("service %q: %v", err.Key, err.error)
+	return fmt.Sprintf("service %s: %v", err.Key, err.error)
 }
 
 func wrapServiceError(err error, key Key) error {
