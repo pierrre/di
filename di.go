@@ -32,8 +32,8 @@ func MustSet[S any](ctn *Container, name string, b Builder[S]) {
 //
 // If the service is not found, it returns [ErrNotSet].
 //
-// If the service is not yet initialized, it calls its builder.
-// If the builder fails, it returns the error.
+// If the service is not yet initialized, it calls its [Builder].
+// If the [Builder] fails, it returns the error.
 func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err error) {
 	key := newKey[S](name)
 	v, err := ctn.get(ctx, key)
@@ -84,7 +84,9 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 // It can be nil if the service does not need to be closed.
 // After it is called, the service instance must not be used anymore.
 //
-// If it calls [Get] it must provide the same [context.Context].
+// If it panics, it's recovered as a [PanicError].
+//
+// If it calls [Get], it must provide the same [context.Context].
 type Builder[S any] func(ctx context.Context, ctn *Container) (S, Close, error)
 
 // Close closes a service.
