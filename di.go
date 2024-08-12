@@ -13,7 +13,8 @@ import (
 // If the service is already set, it returns [ErrAlreadySet].
 func Set[S any](ctn *Container, name string, b Builder[S]) (err error) {
 	key := newKey[S](name)
-	return ctn.set(key, func(ctx context.Context, ctn *Container) (any, Close, error) {
+	typ := reflect.TypeFor[S]()
+	return ctn.set(key, typ, func(ctx context.Context, ctn *Container) (any, Close, error) {
 		return b(ctx, ctn)
 	})
 }
@@ -60,7 +61,7 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 	var names []string
 	typ := reflect.TypeFor[S]()
 	ctn.all(func(key Key, sw *serviceWrapper) {
-		if sw.key.Type == typ {
+		if sw.typ == typ {
 			names = append(names, key.Name)
 		}
 	})

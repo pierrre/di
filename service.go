@@ -2,9 +2,8 @@ package di
 
 import (
 	"context"
+	"reflect"
 	"sync"
-
-	"github.com/pierrre/go-libs/reflectutil"
 )
 
 type builder func(ctx context.Context, ctn *Container) (any, Close, error)
@@ -12,6 +11,7 @@ type builder func(ctx context.Context, ctn *Container) (any, Close, error)
 type serviceWrapper struct {
 	mu          *mutex
 	key         Key
+	typ         reflect.Type
 	builder     builder
 	initialized bool
 	service     any
@@ -19,10 +19,11 @@ type serviceWrapper struct {
 	dependency  *Dependency
 }
 
-func newServiceWrapper(key Key, b builder) *serviceWrapper {
+func newServiceWrapper(key Key, typ reflect.Type, b builder) *serviceWrapper {
 	return &serviceWrapper{
 		mu:      newMutex(),
 		key:     key,
+		typ:     typ,
 		builder: b,
 	}
 }
@@ -68,8 +69,8 @@ func (sw *serviceWrapper) ensureInitialized(ctx context.Context, ctn *Container)
 	sw.service = s
 	sw.cl = cl
 	sw.dependency = &Dependency{
-		Type:         reflectutil.TypeFullName(sw.key.Type),
-		reflectType:  sw.key.Type,
+		Type:         sw.key.Type,
+		reflectType:  sw.typ,
 		Name:         sw.key.Name,
 		Dependencies: dc.dependencies,
 	}

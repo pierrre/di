@@ -16,9 +16,9 @@ type Container struct {
 	services serviceWrapperMap
 }
 
-func (c *Container) set(key Key, b builder) (err error) {
+func (c *Container) set(key Key, typ reflect.Type, b builder) (err error) {
 	defer wrapReturnServiceError(&err, key)
-	sw := newServiceWrapper(key, b)
+	sw := newServiceWrapper(key, typ, b)
 	return c.services.set(key, sw)
 }
 
@@ -67,21 +67,20 @@ func (c *Container) Close(ctx context.Context) error {
 
 // Key represents a service key in a [Container].
 type Key struct {
-	Type reflect.Type
+	Type string
 	Name string
 }
 
 func newKey[S any](name string) Key {
 	return Key{
-		Type: reflect.TypeFor[S](),
+		Type: reflectutil.TypeFullNameFor[S](),
 		Name: name,
 	}
 }
 
 func (k Key) String() string {
-	typName := reflectutil.TypeFullName(k.Type)
 	if k.Name == "" {
-		return typName
+		return k.Type
 	}
-	return fmt.Sprintf("%s(%s)", typName, k.Name)
+	return fmt.Sprintf("%s(%s)", k.Type, k.Name)
 }
