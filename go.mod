@@ -9,5 +9,5 @@ require (
 
 require (
 	github.com/pierrre/compare v1.4.13 // indirect
-	github.com/pierrre/pretty v0.7.1 // indirect
+	github.com/pierrre/pretty v0.8.1 // indirect
 )
