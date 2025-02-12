@@ -195,8 +195,7 @@ func BenchmarkGet(b *testing.B) {
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_, _ = Get[string](ctx, ctn, "")
 	}
 }

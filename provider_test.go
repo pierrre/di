@@ -100,8 +100,7 @@ func BenchmarkProviderGet(b *testing.B) {
 		return "test", nil, nil
 	})
 	p := newProvider[string](ctn, "")
-	b.ResetTimer()
-	for range b.N {
+	for b.Loop() {
 		_, _ = p.Get(ctx)
 	}
 }

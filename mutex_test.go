@@ -17,9 +17,8 @@ func BenchmarkMutex(b *testing.B) {
 				ctx, err = newMutex().lock(ctx)
 				assert.NoError(b, err)
 			}
-			b.ResetTimer()
 			mu := newMutex()
-			for range b.N {
+			for b.Loop() {
 				_, _ = mu.lock(ctx)
 				mu.unlock()
 			}
