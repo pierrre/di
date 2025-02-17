@@ -87,7 +87,7 @@ func ExampleDependency() {
 }
 
 func TestGetDependency(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		MustGet[string](ctx, ctn, "b")
@@ -158,7 +158,7 @@ func TestGetDependency(t *testing.T) {
 }
 
 func TestGetDependencyErrorNotSet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	_, err := GetDependency[string](ctx, ctn, "")
 	assert.ErrorIs(t, err, ErrNotSet)
@@ -169,7 +169,7 @@ func TestGetDependencyErrorNotSet(t *testing.T) {
 }
 
 func TestGetDependencyErrorBuilder(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
@@ -182,7 +182,7 @@ func TestGetDependencyErrorBuilder(t *testing.T) {
 }
 
 func TestGetDependencyErrorCycle(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := newTestContainerCycle()
 	_, err := GetDependency[string](ctx, ctn, "a")
 	assert.ErrorIs(t, err, ErrCycle)
@@ -190,7 +190,7 @@ func TestGetDependencyErrorCycle(t *testing.T) {
 }
 
 func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	started := make(chan struct{})
 	block := make(chan struct{})

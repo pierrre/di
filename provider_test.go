@@ -25,7 +25,7 @@ func ExampleProvider() {
 }
 
 func TestProvider(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "test", nil, nil
@@ -53,7 +53,7 @@ func TestMustSetProviderPanic(t *testing.T) {
 }
 
 func TestMustGetProviderPanic(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	assert.Panics(t, func() {
 		MustGetProvider[string](ctx, ctn, "")
@@ -61,7 +61,7 @@ func TestMustGetProviderPanic(t *testing.T) {
 }
 
 func TestProviderGetAllocs(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "test", nil, nil
@@ -73,7 +73,7 @@ func TestProviderGetAllocs(t *testing.T) {
 }
 
 func TestProviderGetError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	p := newProvider[string](ctn, "")
 	_, err := p.Get(ctx)
@@ -85,7 +85,7 @@ func TestProviderGetError(t *testing.T) {
 }
 
 func TestProviderMustGetPanic(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	p := newProvider[string](ctn, "")
 	assert.Panics(t, func() {
@@ -94,7 +94,7 @@ func TestProviderMustGetPanic(t *testing.T) {
 }
 
 func BenchmarkProviderGet(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "test", nil, nil

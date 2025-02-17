@@ -11,7 +11,7 @@ import (
 )
 
 func TestContainerClose(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	builderCalled := 0
 	closeCalled := 0
@@ -34,7 +34,7 @@ func TestContainerClose(t *testing.T) {
 }
 
 func TestContainerCloseOrder(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	count := 5
 	var closeCalls []int
@@ -54,7 +54,7 @@ func TestContainerCloseOrder(t *testing.T) {
 }
 
 func TestContainerCloseNil(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	builderCalled := 0
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
@@ -72,7 +72,7 @@ func TestContainerCloseNil(t *testing.T) {
 }
 
 func TestContainerCloseNotInitialized(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
@@ -84,7 +84,7 @@ func TestContainerCloseNotInitialized(t *testing.T) {
 }
 
 func TestContainerCloseError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", func(ctx context.Context) error {
@@ -100,7 +100,7 @@ func TestContainerCloseError(t *testing.T) {
 }
 
 func TestContainerCloseErrorServiceWrapperMutexContextCanceled(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	started := make(chan struct{})
 	block := make(chan struct{})

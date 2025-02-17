@@ -10,7 +10,7 @@ import (
 )
 
 func Test(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	builderCallCount := 0
 	err := Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
@@ -56,7 +56,7 @@ func TestMustSetPanicAlreadySet(t *testing.T) {
 }
 
 func TestGetErrorNotSet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	_, err := Get[string](ctx, ctn, "")
 	var serviceErr *ServiceError
@@ -67,7 +67,7 @@ func TestGetErrorNotSet(t *testing.T) {
 }
 
 func TestGetErrorBuilder(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
@@ -80,7 +80,7 @@ func TestGetErrorBuilder(t *testing.T) {
 }
 
 func TestGetErrorPanic(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	e := errors.New("error")
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
@@ -98,7 +98,7 @@ func TestGetErrorPanic(t *testing.T) {
 }
 
 func TestGetErrorPanicChain(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		MustGet[string](ctx, ctn, "b")
@@ -116,7 +116,7 @@ func TestGetErrorPanicChain(t *testing.T) {
 }
 
 func TestGetErrorCycle(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := newTestContainerCycle()
 	_, err := Get[string](ctx, ctn, "a")
 	assert.ErrorIs(t, err, ErrCycle)
@@ -150,7 +150,7 @@ func newTestContainerCycle() *Container {
 }
 
 func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	started := make(chan struct{})
 	block := make(chan struct{})
@@ -172,7 +172,7 @@ func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 }
 
 func TestMustGet(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "test", nil, nil
@@ -182,7 +182,7 @@ func TestMustGet(t *testing.T) {
 }
 
 func TestMustGetPanic(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	assert.Panics(t, func() {
 		MustGet[string](ctx, ctn, "")
@@ -190,7 +190,7 @@ func TestMustGetPanic(t *testing.T) {
 }
 
 func BenchmarkGet(b *testing.B) {
-	ctx := context.Background()
+	ctx := b.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
@@ -201,7 +201,7 @@ func BenchmarkGet(b *testing.B) {
 }
 
 func TestGetAll(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
@@ -215,7 +215,7 @@ func TestGetAll(t *testing.T) {
 }
 
 func TestGetAllError(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	ctn := new(Container)
 	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
