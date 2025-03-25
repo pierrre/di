@@ -8,7 +8,7 @@ import (
 func Example_advanced() {
 	ctx := context.Background()
 	ctn := new(Container)
-	defer ctn.Close(ctx)
+	defer ctn.Close(ctx) //nolint:errcheck
 	MustSet(ctn, "", buildServiceA)
 	MustSet(ctn, "", buildServiceB)
 	MustSet(ctn, "", buildServiceC)
