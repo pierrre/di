@@ -199,10 +199,9 @@ func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 		<-block
 		return "", nil, nil
 	})
-	wait := goroutine.Wait(ctx, func(ctx context.Context) {
+	defer goroutine.Start(ctx, func(ctx context.Context) {
 		MustGet[string](ctx, ctn, "")
-	})
-	defer wait()
+	}).Wait()
 	defer close(block)
 	<-started
 	ctx, cancel := context.WithCancel(ctx)
