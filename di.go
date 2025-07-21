@@ -21,7 +21,7 @@ func Set[S any](ctn *Container, name string, b Builder[S]) (err error) {
 
 // MustSet calls [Set] and panics if there is an error.
 func MustSet[S any](ctn *Container, name string, b Builder[S]) {
-	err := Set[S](ctn, name, b)
+	err := Set(ctn, name, b)
 	if err != nil {
 		panic(err)
 	}
@@ -41,7 +41,7 @@ func Get[S any](ctx context.Context, ctn *Container, name string) (s S, err erro
 	if err != nil {
 		return s, err
 	}
-	s = v.(S) //nolint:forcetypeassert // We know the type.
+	s, _ = v.(S)
 	return s, nil
 }
 
