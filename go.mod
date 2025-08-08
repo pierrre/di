@@ -11,5 +11,5 @@ require (
 
 require (
 	github.com/pierrre/compare v1.4.14 // indirect
-	github.com/pierrre/pretty v0.19.1 // indirect
+	github.com/pierrre/pretty v0.20.6 // indirect
 )
