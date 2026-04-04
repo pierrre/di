@@ -29,7 +29,7 @@ func (m *mutex) lock(ctx context.Context) (context.Context, error) {
 		})
 		return ctx, nil
 	case <-ctx.Done():
-		return nil, ctx.Err() //nolint:wrapcheck // We don't neet to wrap.
+		return nil, context.Cause(ctx) //nolint:wrapcheck // We don't neet to wrap.
 	}
 }
 
