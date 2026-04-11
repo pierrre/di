@@ -83,7 +83,7 @@ func (p *Provider[S]) MustGet(ctx context.Context) S {
 // Close closes the [Provider].
 //
 // It clears the cached service.
-// However it doesn't close the service.
+// However, it does not close the service.
 //
 // The [Provider] can be used again after being closed.
 func (p *Provider[S]) Close(ctx context.Context) error {
