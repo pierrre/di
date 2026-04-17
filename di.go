@@ -8,7 +8,7 @@ import (
 
 // Set sets a service to a [Container].
 //
-// Name is an optional identifier amongst the services of the same type.
+// Name is an optional identifier for services of the same type.
 //
 // If the service is already set, it returns [ErrAlreadySet].
 func Set[S any](ctn *Container, name string, b Builder[S]) (err error) {
@@ -29,7 +29,7 @@ func MustSet[S any](ctn *Container, name string, b Builder[S]) {
 
 // Get returns a service from a [Container].
 //
-// Name is an optional identifier amongst the services of the same type.
+// Name is an optional identifier for services of the same type.
 //
 // If the service is not found, it returns [ErrNotSet].
 //
@@ -81,7 +81,7 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 
 // Builder builds a service.
 //
-// The [Close] function allows to close the service.
+// The [Close] function allows closing the service.
 // It can be nil if the service does not need to be closed.
 // After it is called, the service instance must not be used anymore.
 //

@@ -1,4 +1,4 @@
-// Package diprovider helps to break circular dependencies.
+// Package diprovider helps break circular dependencies.
 package diprovider
 
 import (
