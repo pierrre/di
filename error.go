@@ -38,7 +38,7 @@ func wrapServiceError(err error, key Key) error {
 	}
 }
 
-func wrapReturnServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer of error.
+func wrapReturnServiceError(perr *error, key Key) { //nolint:gocritic // We need a pointer to an error.
 	err := *perr
 	*perr = wrapServiceError(err, key)
 }
@@ -57,7 +57,7 @@ func (err *PanicError) Unwrap() error {
 	return errw
 }
 
-func recoverPanicToError(perr *error) { //nolint:gocritic // We need a pointer of error.
+func recoverPanicToError(perr *error) { //nolint:gocritic // We need a pointer to an error.
 	r := recover()
 	if r != nil {
 		*perr = &PanicError{
