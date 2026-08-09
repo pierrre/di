@@ -91,4 +91,6 @@ func GetAll[S any](ctx context.Context, ctn *Container) (map[string]S, error) {
 type Builder[S any] func(ctx context.Context, ctn *Container) (S, Close, error)
 
 // Close closes a service.
+//
+// If it panics, it's recovered as a [PanicError].
 type Close func(ctx context.Context) error

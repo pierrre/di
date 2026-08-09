@@ -99,6 +99,36 @@ func TestContainerCloseError(t *testing.T) {
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 }
 
+func TestContainerClosePanic(t *testing.T) {
+	ctx := t.Context()
+	ctn := new(Container)
+	e := errors.New("error")
+	MustSet(ctn, "00000", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", func(ctx context.Context) error {
+			panic(e)
+		}, nil
+	})
+	closeCalled := 0
+	MustSet(ctn, "00001", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", func(ctx context.Context) error {
+			closeCalled++
+			return nil
+		}, nil
+	})
+	MustGet[string](ctx, ctn, "00000")
+	MustGet[string](ctx, ctn, "00001")
+	err := ctn.Close(ctx)
+	var serviceErr *ServiceError
+	assert.ErrorAs(t, err, &serviceErr)
+	assert.Equal(t, serviceErr.Key, newKey[string]("00000"))
+	var panicErr *PanicError
+	assert.ErrorAs(t, err, &panicErr)
+	assert.Equal(t, panicErr.Recovered, any(e))
+	assert.ErrorIs(t, err, e)
+	assert.ErrorEqual(t, err, "service string(00000): panic: error")
+	assert.Equal(t, closeCalled, 1)
+}
+
 func TestContainerCloseErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
