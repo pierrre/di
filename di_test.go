@@ -36,8 +36,7 @@ func TestSetErrorAlreadySet(t *testing.T) {
 	err = Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorIs(t, err, ErrAlreadySet)
 	assert.ErrorEqual(t, err, "service string: already set")
@@ -59,8 +58,7 @@ func TestGetErrorNotSet(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
 	_, err := Get[string](ctx, ctn, "")
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorIs(t, err, ErrNotSet)
 	assert.ErrorEqual(t, err, "service string: not set")
@@ -73,8 +71,7 @@ func TestGetErrorBuilder(t *testing.T) {
 		return "", nil, errors.New("error")
 	})
 	_, err := Get[string](ctx, ctn, "")
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service string: error")
 }
@@ -87,11 +84,9 @@ func TestGetErrorPanic(t *testing.T) {
 		panic(e)
 	})
 	_, err := Get[string](ctx, ctn, "")
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
-	var panicErr *PanicError
-	assert.ErrorAs(t, err, &panicErr)
+	panicErr, _ := assert.ErrorAsType[*PanicError](t, err)
 	assert.Equal(t, panicErr.Recovered, any(e))
 	assert.ErrorIs(t, err, e)
 	assert.ErrorEqual(t, err, "service string: panic: error")
@@ -220,8 +215,7 @@ func TestGetAllError(t *testing.T) {
 		return "", nil, errors.New("error")
 	})
 	_, err := GetAll[string](ctx, ctn)
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service string: error")
 }

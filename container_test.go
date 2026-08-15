@@ -94,8 +94,7 @@ func TestContainerCloseError(t *testing.T) {
 	_, err := Get[string](ctx, ctn, "")
 	assert.NoError(t, err)
 	err = ctn.Close(ctx)
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 }
 

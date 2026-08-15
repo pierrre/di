@@ -78,8 +78,7 @@ func TestProviderGetError(t *testing.T) {
 	ctn := new(di.Container)
 	p := newProvider[string](ctn, "")
 	_, err := p.Get(ctx)
-	var serviceErr *di.ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*di.ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, di.Key{Type: "string", Name: ""})
 	assert.ErrorIs(t, err, di.ErrNotSet)
 	assert.ErrorEqual(t, err, "service string: not set")

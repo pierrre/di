@@ -162,8 +162,7 @@ func TestGetDependencyErrorNotSet(t *testing.T) {
 	ctn := new(Container)
 	_, err := GetDependency[string](ctx, ctn, "")
 	assert.ErrorIs(t, err, ErrNotSet)
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service string: not set")
 }
@@ -175,8 +174,7 @@ func TestGetDependencyErrorBuilder(t *testing.T) {
 		return "", nil, errors.New("error")
 	})
 	_, err := GetDependency[string](ctx, ctn, "")
-	var serviceErr *ServiceError
-	assert.ErrorAs(t, err, &serviceErr)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service string: error")
 }
