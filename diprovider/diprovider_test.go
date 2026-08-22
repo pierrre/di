@@ -12,7 +12,7 @@ import (
 func Example() {
 	ctx := context.Background()
 	ctn := new(di.Container)
-	di.MustSet(ctn, "", func(ctx context.Context, ctn *di.Container) (string, di.Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *di.Container) (string, di.Close, error) {
 		fmt.Println("build")
 		return "test", nil, nil
 	})
@@ -28,7 +28,7 @@ func Example() {
 func Test(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(di.Container)
-	di.MustSet(ctn, "", func(ctx context.Context, ctn *di.Container) (string, di.Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *di.Container) (string, di.Close, error) {
 		return "test", nil, nil
 	})
 	err := Set[string](ctn, "")
@@ -64,7 +64,7 @@ func TestMustGetPanic(t *testing.T) {
 func TestProviderGetAllocs(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(di.Container)
-	di.MustSet(ctn, "", func(ctx context.Context, ctn *di.Container) (string, di.Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *di.Container) (string, di.Close, error) {
 		return "test", nil, nil
 	})
 	p := newProvider[string](ctn, "")
@@ -96,7 +96,7 @@ func TestProviderMustGetPanic(t *testing.T) {
 func BenchmarkProviderGet(b *testing.B) {
 	ctx := b.Context()
 	ctn := new(di.Container)
-	di.MustSet(ctn, "", func(ctx context.Context, ctn *di.Container) (string, di.Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *di.Container) (string, di.Close, error) {
 		return "test", nil, nil
 	})
 	p := newProvider[string](ctn, "")

@@ -6,12 +6,6 @@ import (
 	"sync"
 )
 
-// GetDependency returns a service [Dependency] tree from a [Container].
-func GetDependency[S any](ctx context.Context, ctn *Container, name string) (dep *Dependency, err error) {
-	key := newKey[S](name)
-	return ctn.getDependency(ctx, key)
-}
-
 // Dependency represents a service dependency.
 type Dependency struct {
 	Type         string `json:"type"`

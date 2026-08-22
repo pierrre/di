@@ -15,7 +15,7 @@ func TestContainerClose(t *testing.T) {
 	ctn := new(Container)
 	builderCalled := 0
 	closeCalled := 0
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCalled++
 		return "", func(ctx context.Context) error {
 			closeCalled++
@@ -24,7 +24,7 @@ func TestContainerClose(t *testing.T) {
 	})
 	count := 5
 	for range count {
-		_, err := Get[string](ctx, ctn, "")
+		_, err := ctn.Get[string](ctx, "")
 		assert.NoError(t, err)
 		err = ctn.Close(ctx)
 		assert.NoError(t, err)
@@ -40,13 +40,13 @@ func TestContainerCloseOrder(t *testing.T) {
 	var closeCalls []int
 	for i := range count {
 		name := fmt.Sprintf("%05d", i)
-		MustSet(ctn, name, func(ctx context.Context, ctn *Container) (string, Close, error) {
+		ctn.MustSet(name, func(ctx context.Context, ctn *Container) (string, Close, error) {
 			return "", func(ctx context.Context) error {
 				closeCalls = append(closeCalls, i)
 				return nil
 			}, nil
 		})
-		MustGet[string](ctx, ctn, name)
+		ctn.MustGet[string](ctx, name)
 	}
 	err := ctn.Close(ctx)
 	assert.NoError(t, err)
@@ -57,13 +57,13 @@ func TestContainerCloseNil(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
 	builderCalled := 0
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCalled++
 		return "", nil, nil
 	})
 	count := 5
 	for range count {
-		_, err := Get[string](ctx, ctn, "")
+		_, err := ctn.Get[string](ctx, "")
 		assert.NoError(t, err)
 		err = ctn.Close(ctx)
 		assert.NoError(t, err)
@@ -74,10 +74,10 @@ func TestContainerCloseNil(t *testing.T) {
 func TestContainerCloseNotInitialized(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
 	})
-	_, err := Get[string](ctx, ctn, "")
+	_, err := ctn.Get[string](ctx, "")
 	assert.Error(t, err)
 	err = ctn.Close(ctx)
 	assert.NoError(t, err)
@@ -86,12 +86,12 @@ func TestContainerCloseNotInitialized(t *testing.T) {
 func TestContainerCloseError(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", func(ctx context.Context) error {
 			return errors.New("error")
 		}, nil
 	})
-	_, err := Get[string](ctx, ctn, "")
+	_, err := ctn.Get[string](ctx, "")
 	assert.NoError(t, err)
 	err = ctn.Close(ctx)
 	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
@@ -103,13 +103,13 @@ func TestContainerCloseErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctn := new(Container)
 	started := make(chan struct{})
 	block := make(chan struct{})
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		close(started)
 		<-block
 		return "", nil, nil
 	})
 	defer goroutine.Start(ctx, func(ctx context.Context) {
-		MustGet[string](ctx, ctn, "")
+		ctn.MustGet[string](ctx, "")
 	}).Wait()
 	defer close(block)
 	<-started

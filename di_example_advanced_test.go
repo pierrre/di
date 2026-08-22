@@ -9,11 +9,11 @@ func Example_advanced() {
 	ctx := context.Background()
 	ctn := new(Container)
 	defer ctn.Close(ctx) //nolint:errcheck
-	MustSet(ctn, "", buildServiceA)
-	MustSet(ctn, "", buildServiceB)
-	MustSet(ctn, "", buildServiceC)
+	ctn.MustSet("", buildServiceA)
+	ctn.MustSet("", buildServiceB)
+	ctn.MustSet("", buildServiceC)
 	fmt.Println("configured")
-	sa := MustGet[*serviceA](ctx, ctn, "")
+	sa := ctn.MustGet[*serviceA](ctx, "")
 	fmt.Println("initialized")
 	sa.doA()
 	// Output:
@@ -40,8 +40,8 @@ func buildServiceA(ctx context.Context, ctn *Container) (*serviceA, Close, error
 	fmt.Println("start build A")
 	defer fmt.Println("end build A")
 	return &serviceA{
-		b: MustGet[*serviceB](ctx, ctn, "").doB,
-		c: MustGet[*serviceC](ctx, ctn, "").doC,
+		b: ctn.MustGet[*serviceB](ctx, "").doB,
+		c: ctn.MustGet[*serviceC](ctx, "").doC,
 	}, nil, nil
 }
 

@@ -8,10 +8,10 @@ import (
 func Example() {
 	ctx := context.Background()
 	ctn := new(Container)
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (*myService, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (*myService, Close, error) {
 		return &myService{}, nil, nil
 	})
-	s := MustGet[*myService](ctx, ctn, "")
+	s := ctn.MustGet[*myService](ctx, "")
 	s.myMethod()
 	// Output:
 	// myService.myMethod

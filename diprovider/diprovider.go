@@ -10,12 +10,12 @@ import (
 
 // Set sets a [Provider] to a [di.Container].
 func Set[S any](ctn *di.Container, name string) error {
-	return di.Set(ctn, name, newProviderBuilder[S](name)) //nolint:wrapcheck // It's from the same module.
+	return ctn.Set(name, newProviderBuilder[S](name)) //nolint:wrapcheck // It's from the same module.
 }
 
 // MustSet calls [MustSet] for a [Provider].
 func MustSet[S any](ctn *di.Container, name string) {
-	di.MustSet(ctn, name, newProviderBuilder[S](name))
+	ctn.MustSet(name, newProviderBuilder[S](name))
 }
 
 func newProviderBuilder[S any](name string) di.Builder[*Provider[S]] {
@@ -27,12 +27,12 @@ func newProviderBuilder[S any](name string) di.Builder[*Provider[S]] {
 
 // Get returns a [Provider] from a [di.Container].
 func Get[S any](ctx context.Context, ctn *di.Container, name string) (*Provider[S], error) {
-	return di.Get[*Provider[S]](ctx, ctn, name)
+	return ctn.Get[*Provider[S]](ctx, name)
 }
 
 // MustGet calls [MustGet] for a [Provider].
 func MustGet[S any](ctx context.Context, ctn *di.Container, name string) *Provider[S] {
-	return di.MustGet[*Provider[S]](ctx, ctn, name)
+	return ctn.MustGet[*Provider[S]](ctx, name)
 }
 
 // Provider provides a service.
@@ -62,7 +62,7 @@ func (p *Provider[S]) Get(ctx context.Context) (S, error) {
 	if p.initialized {
 		return p.service, nil
 	}
-	s, err := di.Get[S](ctx, p.Container, p.Name)
+	s, err := p.Container.Get[S](ctx, p.Name)
 	if err != nil {
 		return s, err
 	}

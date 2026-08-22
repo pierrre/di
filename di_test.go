@@ -13,15 +13,15 @@ func Test(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
 	builderCallCount := 0
-	err := Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	err := ctn.Set("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		builderCallCount++
 		return "test", nil, nil
 	})
 	assert.NoError(t, err)
-	sa, err := Get[string](ctx, ctn, "")
+	sa, err := ctn.Get[string](ctx, "")
 	assert.NoError(t, err)
 	assert.NotZero(t, sa)
-	sa, err = Get[string](ctx, ctn, "")
+	sa, err = ctn.Get[string](ctx, "")
 	assert.NoError(t, err)
 	assert.NotZero(t, sa)
 	assert.Equal(t, builderCallCount, 1)
@@ -29,11 +29,11 @@ func Test(t *testing.T) {
 
 func TestSetErrorAlreadySet(t *testing.T) {
 	ctn := new(Container)
-	err := Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	err := ctn.Set("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
 	assert.NoError(t, err)
-	err = Set(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	err = ctn.Set("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
 	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
@@ -44,11 +44,11 @@ func TestSetErrorAlreadySet(t *testing.T) {
 
 func TestMustSetPanicAlreadySet(t *testing.T) {
 	ctn := new(Container)
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
 	assert.Panics(t, func() {
-		MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 			return "", nil, nil
 		})
 	})
@@ -57,7 +57,7 @@ func TestMustSetPanicAlreadySet(t *testing.T) {
 func TestGetErrorNotSet(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
-	_, err := Get[string](ctx, ctn, "")
+	_, err := ctn.Get[string](ctx, "")
 	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorIs(t, err, ErrNotSet)
@@ -67,10 +67,10 @@ func TestGetErrorNotSet(t *testing.T) {
 func TestGetErrorBuilder(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
 	})
-	_, err := Get[string](ctx, ctn, "")
+	_, err := ctn.Get[string](ctx, "")
 	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service string: error")
@@ -80,10 +80,10 @@ func TestGetErrorPanic(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
 	e := errors.New("error")
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		panic(e)
 	})
-	_, err := Get[string](ctx, ctn, "")
+	_, err := ctn.Get[string](ctx, "")
 	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	panicErr, _ := assert.ErrorAsType[*PanicError](t, err)
@@ -95,47 +95,47 @@ func TestGetErrorPanic(t *testing.T) {
 func TestGetErrorPanicChain(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
-	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		MustGet[string](ctx, ctn, "b")
+	ctn.MustSet("a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		ctn.MustGet[string](ctx, "b")
 		return "", nil, nil
 	})
-	MustSet(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		MustGet[string](ctx, ctn, "c")
+	ctn.MustSet("b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		ctn.MustGet[string](ctx, "c")
 		return "", nil, nil
 	})
-	MustSet(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("c", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		panic("test")
 	})
-	_, err := Get[string](ctx, ctn, "a")
+	_, err := ctn.Get[string](ctx, "a")
 	assert.ErrorEqual(t, err, "service string(a): panic: service string(b): panic: service string(c): panic: test")
 }
 
 func TestGetErrorCycle(t *testing.T) {
 	ctx := t.Context()
 	ctn := newTestContainerCycle()
-	_, err := Get[string](ctx, ctn, "a")
+	_, err := ctn.Get[string](ctx, "a")
 	assert.ErrorIs(t, err, ErrCycle)
 	assert.ErrorEqual(t, err, "service string(a): service string(b): service string(c): service string(a): cycle")
 }
 
 func newTestContainerCycle() *Container {
 	ctn := new(Container)
-	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		_, err := Get[string](ctx, ctn, "b")
+	ctn.MustSet("a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		_, err := ctn.Get[string](ctx, "b")
 		if err != nil {
 			return "", nil, err
 		}
 		return "", nil, nil
 	})
-	MustSet(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		_, err := Get[string](ctx, ctn, "c")
+	ctn.MustSet("b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		_, err := ctn.Get[string](ctx, "c")
 		if err != nil {
 			return "", nil, err
 		}
 		return "", nil, nil
 	})
-	MustSet(ctn, "c", func(ctx context.Context, ctn *Container) (string, Close, error) {
-		_, err := Get[string](ctx, ctn, "a")
+	ctn.MustSet("c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		_, err := ctn.Get[string](ctx, "a")
 		if err != nil {
 			return "", nil, err
 		}
@@ -149,29 +149,29 @@ func TestGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctn := new(Container)
 	started := make(chan struct{})
 	block := make(chan struct{})
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		close(started)
 		<-block
 		return "", nil, nil
 	})
 	defer goroutine.Start(ctx, func(ctx context.Context) {
-		MustGet[string](ctx, ctn, "")
+		ctn.MustGet[string](ctx, "")
 	}).Wait()
 	defer close(block)
 	<-started
 	ctx, cancel := context.WithCancel(ctx)
 	cancel()
-	_, err := Get[string](ctx, ctn, "")
+	_, err := ctn.Get[string](ctx, "")
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
 func TestMustGet(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "test", nil, nil
 	})
-	sa := MustGet[string](ctx, ctn, "")
+	sa := ctn.MustGet[string](ctx, "")
 	assert.NotZero(t, sa)
 }
 
@@ -179,31 +179,31 @@ func TestMustGetPanic(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
 	assert.Panics(t, func() {
-		MustGet[string](ctx, ctn, "")
+		ctn.MustGet[string](ctx, "")
 	})
 }
 
 func BenchmarkGet(b *testing.B) {
 	ctx := b.Context()
 	ctn := new(Container)
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
 	for b.Loop() {
-		_, _ = Get[string](ctx, ctn, "")
+		_, _ = ctn.Get[string](ctx, "")
 	}
 }
 
 func TestGetAll(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
-	MustSet(ctn, "a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("a", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	MustSet(ctn, "b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("b", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, nil
 	})
-	ss, err := GetAll[string](ctx, ctn)
+	ss, err := ctn.GetAll[string](ctx)
 	assert.NoError(t, err)
 	assert.MapLen(t, ss, 2)
 }
@@ -211,10 +211,10 @@ func TestGetAll(t *testing.T) {
 func TestGetAllError(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)
-	MustSet(ctn, "", func(ctx context.Context, ctn *Container) (string, Close, error) {
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "", nil, errors.New("error")
 	})
-	_, err := GetAll[string](ctx, ctn)
+	_, err := ctn.GetAll[string](ctx)
 	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
 	assert.Equal(t, serviceErr.Key, newKey[string](""))
 	assert.ErrorEqual(t, err, "service string: error")
