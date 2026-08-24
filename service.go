@@ -3,8 +3,6 @@ package di
 import (
 	"context"
 	"reflect"
-
-	"github.com/pierrre/go-libs/syncutil"
 )
 
 type builder func(ctx context.Context, ctn *Container) (any, Close, error)
@@ -95,40 +93,4 @@ func (sw *serviceWrapper) close(ctx context.Context) error {
 	sw.cl = nil
 	sw.dependency = nil
 	return err
-}
-
-type serviceWrapperMap struct {
-	m syncutil.Map[Key, *serviceWrapper]
-}
-
-func (m *serviceWrapperMap) set(key Key, sw *serviceWrapper) error {
-	_, ok := m.m.LoadOrStore(key, sw)
-	if ok {
-		return ErrAlreadySet
-	}
-	return nil
-}
-
-func (m *serviceWrapperMap) get(key Key) (*serviceWrapper, error) {
-	sw, ok := m.m.Load(key)
-	if !ok {
-		return nil, ErrNotSet
-	}
-	return sw, nil
-}
-
-func (m *serviceWrapperMap) all(f func(key Key, sw *serviceWrapper)) {
-	m.m.Range(func(key Key, sw *serviceWrapper) bool {
-		f(key, sw)
-		return true
-	})
-}
-
-func (m *serviceWrapperMap) getValues() []*serviceWrapper {
-	var sws []*serviceWrapper
-	m.m.Range(func(key Key, sw *serviceWrapper) bool {
-		sws = append(sws, sw)
-		return true
-	})
-	return sws
 }

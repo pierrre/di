@@ -9,11 +9,12 @@ import (
 	"strings"
 
 	"github.com/pierrre/go-libs/reflectutil"
+	"github.com/pierrre/go-libs/syncutil"
 )
 
 // Container contains services.
 type Container struct {
-	services serviceWrapperMap
+	services syncutil.Map[Key, *serviceWrapper]
 }
 
 // Set sets a service to the [Container].
@@ -32,7 +33,11 @@ func (c *Container) Set[S any](name string, b Builder[S]) (err error) {
 func (c *Container) set(key Key, typ reflect.Type, b builder) (err error) {
 	defer wrapReturnServiceError(&err, key)
 	sw := newServiceWrapper(key, typ, b)
-	return c.services.set(key, sw)
+	_, ok := c.services.LoadOrStore(key, sw)
+	if ok {
+		return ErrAlreadySet
+	}
+	return nil
 }
 
 // MustSet calls [Container.Set] and panics if there is an error.
@@ -63,11 +68,19 @@ func (c *Container) Get[S any](ctx context.Context, name string) (s S, err error
 
 func (c *Container) get(ctx context.Context, key Key) (v any, err error) {
 	defer wrapReturnServiceError(&err, key)
-	sw, err := c.services.get(key)
+	sw, err := c.getServiceWrapper(key)
 	if err != nil {
 		return nil, err
 	}
 	return sw.get(ctx, c)
+}
+
+func (c *Container) getServiceWrapper(key Key) (*serviceWrapper, error) {
+	sw, ok := c.services.Load(key)
+	if !ok {
+		return nil, ErrNotSet
+	}
+	return sw, nil
 }
 
 // MustGet calls [Container.Get] and panics if there is an error.
@@ -87,7 +100,7 @@ func (c *Container) GetDependency[S any](ctx context.Context, name string) (dep 
 
 func (c *Container) getDependency(ctx context.Context, key Key) (d *Dependency, err error) {
 	defer wrapReturnServiceError(&err, key)
-	sw, err := c.services.get(key)
+	sw, err := c.getServiceWrapper(key)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +133,10 @@ func (c *Container) GetAll[S any](ctx context.Context) (map[string]S, error) {
 }
 
 func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
-	c.services.all(f)
+	c.services.Range(func(key Key, sw *serviceWrapper) bool {
+		f(key, sw)
+		return true
+	})
 }
 
 // Close closes all the services of the [Container].
@@ -129,7 +145,7 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 //
 // The [Container] can be used again after being closed.
 func (c *Container) Close(ctx context.Context) error {
-	sws := c.services.getValues()
+	sws := c.getAllServiceWrappers()
 	slices.SortFunc(sws, func(a, b *serviceWrapper) int {
 		return cmp.Or(
 			strings.Compare(a.key.Type, b.key.Type),
@@ -145,6 +161,15 @@ func (c *Container) Close(ctx context.Context) error {
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func (c *Container) getAllServiceWrappers() []*serviceWrapper {
+	var sws []*serviceWrapper
+	c.services.Range(func(key Key, sw *serviceWrapper) bool {
+		sws = append(sws, sw)
+		return true
+	})
+	return sws
 }
 
 // Key represents a service key in a [Container].
