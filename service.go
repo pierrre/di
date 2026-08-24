@@ -3,7 +3,8 @@ package di
 import (
 	"context"
 	"reflect"
-	"sync"
+
+	"github.com/pierrre/go-libs/syncutil"
 )
 
 type builder func(ctx context.Context, ctn *Container) (any, Close, error)
@@ -97,28 +98,19 @@ func (sw *serviceWrapper) close(ctx context.Context) error {
 }
 
 type serviceWrapperMap struct {
-	mu sync.Mutex
-	m  map[Key]*serviceWrapper
+	m syncutil.Map[Key, *serviceWrapper]
 }
 
 func (m *serviceWrapperMap) set(key Key, sw *serviceWrapper) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.m == nil {
-		m.m = make(map[Key]*serviceWrapper)
-	}
-	_, ok := m.m[key]
+	_, ok := m.m.LoadOrStore(key, sw)
 	if ok {
 		return ErrAlreadySet
 	}
-	m.m[key] = sw
 	return nil
 }
 
 func (m *serviceWrapperMap) get(key Key) (*serviceWrapper, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	sw, ok := m.m[key]
+	sw, ok := m.m.Load(key)
 	if !ok {
 		return nil, ErrNotSet
 	}
@@ -126,19 +118,17 @@ func (m *serviceWrapperMap) get(key Key) (*serviceWrapper, error) {
 }
 
 func (m *serviceWrapperMap) all(f func(key Key, sw *serviceWrapper)) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for key, sw := range m.m {
+	m.m.Range(func(key Key, sw *serviceWrapper) bool {
 		f(key, sw)
-	}
+		return true
+	})
 }
 
 func (m *serviceWrapperMap) getValues() []*serviceWrapper {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	sws := make([]*serviceWrapper, 0, len(m.m))
-	for _, sw := range m.m {
+	var sws []*serviceWrapper
+	m.m.Range(func(key Key, sw *serviceWrapper) bool {
 		sws = append(sws, sw)
-	}
+		return true
+	})
 	return sws
 }
