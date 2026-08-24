@@ -131,12 +131,7 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 // The [Container] can be used again after being closed.
 func (c *Container) Close(ctx context.Context) error {
 	sws := c.getAllServiceWrappers()
-	slices.SortFunc(sws, func(a, b *serviceWrapper) int {
-		return cmp.Or(
-			strings.Compare(a.key.Type, b.key.Type),
-			strings.Compare(a.key.Name, b.key.Name),
-		)
-	})
+	slices.SortFunc(sws, (*serviceWrapper).compare)
 	var errs []error
 	for _, sw := range sws {
 		err := sw.close(ctx)
@@ -168,6 +163,14 @@ func newKey[S any](name string) Key {
 		Type: reflectutil.TypeFullNameFor[S](),
 		Name: name,
 	}
+}
+
+// Compare compares 2 keys.
+func (k Key) Compare(k2 Key) int {
+	return cmp.Or(
+		strings.Compare(k.Type, k2.Type),
+		strings.Compare(k.Name, k2.Name),
+	)
 }
 
 func (k Key) String() string {

@@ -94,3 +94,7 @@ func (sw *serviceWrapper) close(ctx context.Context) error {
 	sw.dependency = nil
 	return err
 }
+
+func (sw *serviceWrapper) compare(sw2 *serviceWrapper) int {
+	return sw.key.Compare(sw2.key)
+}
