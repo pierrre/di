@@ -4,9 +4,9 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 
 	"github.com/pierrre/go-libs/reflectutil"
 )
@@ -131,7 +131,10 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 func (c *Container) Close(ctx context.Context) error {
 	sws := c.services.getValues()
 	slices.SortFunc(sws, func(a, b *serviceWrapper) int {
-		return cmp.Compare(a.key.String(), b.key.String())
+		return cmp.Or(
+			strings.Compare(a.key.Type, b.key.Type),
+			strings.Compare(a.key.Name, b.key.Name),
+		)
 	})
 	var errs []error
 	for _, sw := range sws {
@@ -161,5 +164,5 @@ func (k Key) String() string {
 	if k.Name == "" {
 		return k.Type
 	}
-	return fmt.Sprintf("%s(%s)", k.Type, k.Name)
+	return k.Type + "(" + k.Name + ")"
 }
