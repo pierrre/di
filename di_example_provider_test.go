@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-func Example_container() {
+func Example_provider() {
 	ctx := context.Background()
 	ctn := new(Container)
 	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
