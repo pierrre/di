@@ -13,7 +13,7 @@ import (
 //
 // If it panics, it's recovered as a [PanicError].
 //
-// If it calls [Get], it must provide the same [context.Context].
+// If it calls [Container.Get], it must provide the same [context.Context].
 type Builder[S any] func(ctx context.Context, ctn *Container) (S, Close, error)
 
 // Close closes a service.
