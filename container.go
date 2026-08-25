@@ -24,15 +24,11 @@ type Container struct {
 // If the service is already set, it returns [ErrAlreadySet].
 func (c *Container) Set[S any](name string, b Builder[S]) (err error) {
 	key := newKey[S](name)
+	defer wrapReturnServiceError(&err, key)
 	typ := reflect.TypeFor[S]()
-	return c.set(key, typ, func(ctx context.Context, ctn *Container) (any, Close, error) {
+	sw := newServiceWrapper(key, typ, func(ctx context.Context, ctn *Container) (any, Close, error) {
 		return b(ctx, ctn)
 	})
-}
-
-func (c *Container) set(key Key, typ reflect.Type, b builder) (err error) {
-	defer wrapReturnServiceError(&err, key)
-	sw := newServiceWrapper(key, typ, b)
 	_, ok := c.services.LoadOrStore(key, sw)
 	if ok {
 		return ErrAlreadySet
@@ -58,21 +54,17 @@ func (c *Container) MustSet[S any](name string, b Builder[S]) {
 // If the [Builder] fails, it returns the error.
 func (c *Container) Get[S any](ctx context.Context, name string) (s S, err error) {
 	key := newKey[S](name)
-	v, err := c.get(ctx, key)
-	if err != nil {
-		return s, err
-	}
-	s, _ = v.(S)
-	return s, nil
-}
-
-func (c *Container) get(ctx context.Context, key Key) (v any, err error) {
 	defer wrapReturnServiceError(&err, key)
 	sw, err := c.getServiceWrapper(key)
 	if err != nil {
-		return nil, err
+		return s, err
 	}
-	return sw.get(ctx, c)
+	si, err := sw.get(ctx, c)
+	if err != nil {
+		return s, err
+	}
+	s, _ = si.(S)
+	return s, nil
 }
 
 func (c *Container) getServiceWrapper(key Key) (*serviceWrapper, error) {
@@ -98,10 +90,11 @@ func (c *Container) MustGet[S any](ctx context.Context, name string) S {
 func (c *Container) GetAll[S any](ctx context.Context) (map[string]S, error) {
 	var names []string
 	typ := reflect.TypeFor[S]()
-	c.all(func(key Key, sw *serviceWrapper) {
+	c.services.Range(func(key Key, sw *serviceWrapper) bool {
 		if sw.typ == typ {
 			names = append(names, key.Name)
 		}
+		return true
 	})
 	var ss map[string]S
 	if len(names) > 0 {
@@ -117,13 +110,6 @@ func (c *Container) GetAll[S any](ctx context.Context) (map[string]S, error) {
 	return ss, nil
 }
 
-func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
-	c.services.Range(func(key Key, sw *serviceWrapper) bool {
-		f(key, sw)
-		return true
-	})
-}
-
 // Close closes all the services of the [Container].
 //
 // The created services must not be used after this call.
@@ -132,7 +118,11 @@ func (c *Container) all(f func(key Key, sw *serviceWrapper)) {
 //
 // The [Container] can be used again after being closed.
 func (c *Container) Close(ctx context.Context) error {
-	sws := c.getAllServiceWrappers()
+	var sws []*serviceWrapper
+	c.services.Range(func(key Key, sw *serviceWrapper) bool {
+		sws = append(sws, sw)
+		return true
+	})
 	slices.SortFunc(sws, (*serviceWrapper).compare)
 	var errs []error
 	for _, sw := range sws {
@@ -143,15 +133,6 @@ func (c *Container) Close(ctx context.Context) error {
 		}
 	}
 	return errors.Join(errs...)
-}
-
-func (c *Container) getAllServiceWrappers() []*serviceWrapper {
-	var sws []*serviceWrapper
-	c.services.Range(func(key Key, sw *serviceWrapper) bool {
-		sws = append(sws, sw)
-		return true
-	})
-	return sws
 }
 
 // Key represents a service key in a [Container].
