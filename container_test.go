@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/pierrre/assert"
@@ -184,6 +185,42 @@ func TestContainerMustGetPanic(t *testing.T) {
 	})
 }
 
+func TestContainerGetConcurrent(t *testing.T) {
+	ctx := t.Context()
+	ctn := new(Container)
+	var builderCallCount atomic.Int32
+	started := make(chan struct{})
+	block := make(chan struct{})
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		builderCallCount.Add(1)
+		close(started)
+		<-block
+		return "test", nil, nil
+	})
+	const workers = 100
+	waiter := goroutine.StartN(ctx, workers, func(ctx context.Context, i int) {
+		s, err := ctn.Get[string](ctx, "")
+		assert.NoError(t, err)
+		assert.Equal(t, s, "test")
+	})
+	<-started
+	close(block)
+	waiter.Wait()
+	assert.Equal(t, builderCallCount.Load(), int32(1))
+}
+
+func TestContainerGetAllocs(t *testing.T) {
+	ctx := t.Context()
+	ctn := new(Container)
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "test", nil, nil
+	})
+	_, _ = ctn.Get[string](ctx, "")
+	assert.AllocsPerRun(t, 100, func() {
+		_, _ = ctn.Get[string](ctx, "")
+	}, 0)
+}
+
 func BenchmarkContainerGet(b *testing.B) {
 	ctx := b.Context()
 	ctn := new(Container)
@@ -193,6 +230,19 @@ func BenchmarkContainerGet(b *testing.B) {
 	for b.Loop() {
 		_, _ = ctn.Get[string](ctx, "")
 	}
+}
+
+func BenchmarkContainerGetParallel(b *testing.B) {
+	ctx := b.Context()
+	ctn := new(Container)
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "", nil, nil
+	})
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			_, _ = ctn.Get[string](ctx, "")
+		}
+	})
 }
 
 func TestContainerGetAll(t *testing.T) {

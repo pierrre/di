@@ -3,77 +3,87 @@ package di
 import (
 	"context"
 	"reflect"
+	"sync/atomic"
 )
 
 type builder func(ctx context.Context, ctn *Container) (any, Close, error)
 
 type serviceWrapper struct {
-	mu          *mutex
-	key         Key
-	typ         reflect.Type
-	builder     builder
-	initialized bool
-	service     any
-	cl          Close
-	dependency  *Dependency
+	key     Key
+	typ     reflect.Type
+	builder builder
+	mu      *mutex
+	content atomic.Pointer[serviceContent]
+}
+
+type serviceContent struct {
+	service    any
+	cl         Close
+	dependency *Dependency
 }
 
 func newServiceWrapper(key Key, typ reflect.Type, b builder) *serviceWrapper {
 	return &serviceWrapper{
-		mu:      newMutex(),
 		key:     key,
 		typ:     typ,
 		builder: b,
+		mu:      newMutex(),
 	}
 }
 
 func (sw *serviceWrapper) get(ctx context.Context, ctn *Container) (any, error) {
-	ctx, err := sw.mu.lock(ctx)
+	sc, err := sw.ensureInitialized(ctx, ctn)
 	if err != nil {
 		return nil, err
 	}
-	defer sw.mu.unlock()
-	err = sw.ensureInitialized(ctx, ctn)
-	if err != nil {
-		return nil, err
-	}
-	addDependencyToCollectorFromContext(ctx, sw.dependency)
-	return sw.service, nil
+	addDependencyToCollectorFromContext(ctx, sc.dependency)
+	return sc.service, nil
 }
 
 func (sw *serviceWrapper) getDependency(ctx context.Context, ctn *Container) (*Dependency, error) {
+	sc, err := sw.ensureInitialized(ctx, ctn)
+	if err != nil {
+		return nil, err
+	}
+	return sc.dependency, nil
+}
+
+func (sw *serviceWrapper) ensureInitialized(ctx context.Context, ctn *Container) (*serviceContent, error) {
+	sc := sw.content.Load()
+	if sc != nil { // Fast path.
+		return sc, nil
+	}
 	ctx, err := sw.mu.lock(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer sw.mu.unlock()
-	err = sw.ensureInitialized(ctx, ctn)
-	if err != nil {
-		return nil, err
+	sc = sw.content.Load()
+	if sc == nil { // This may have been set.
+		sc, err = sw.initialize(ctx, ctn)
 	}
-	return sw.dependency, nil
+	return sc, err
 }
 
-func (sw *serviceWrapper) ensureInitialized(ctx context.Context, ctn *Container) (err error) {
-	if sw.initialized {
-		return nil
-	}
+func (sw *serviceWrapper) initialize(ctx context.Context, ctn *Container) (sc *serviceContent, err error) {
 	ctx, dc := addDependencyCollectorToContext(ctx)
 	defer recoverPanicToError(&err)
 	s, cl, err := sw.builder(ctx, ctn)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	sw.initialized = true
-	sw.service = s
-	sw.cl = cl
-	sw.dependency = &Dependency{
-		Type:         sw.key.Type,
-		reflectType:  sw.typ,
-		Name:         sw.key.Name,
-		Dependencies: dc.dependencies,
+	sc = &serviceContent{
+		service: s,
+		cl:      cl,
+		dependency: &Dependency{
+			Type:         sw.key.Type,
+			reflectType:  sw.typ,
+			Name:         sw.key.Name,
+			Dependencies: dc.dependencies,
+		},
 	}
-	return nil
+	sw.content.Store(sc)
+	return sc, nil
 }
 
 func (sw *serviceWrapper) close(ctx context.Context) error {
@@ -82,16 +92,11 @@ func (sw *serviceWrapper) close(ctx context.Context) error {
 		return err
 	}
 	defer sw.mu.unlock()
-	if !sw.initialized {
-		return nil
+	sc := sw.content.Load()
+	if sc != nil && sc.cl != nil {
+		err = sc.cl(ctx)
 	}
-	if sw.cl != nil {
-		err = sw.cl(ctx)
-	}
-	sw.initialized = false
-	sw.service = nil
-	sw.cl = nil
-	sw.dependency = nil
+	sw.content.Store(nil)
 	return err
 }
 
