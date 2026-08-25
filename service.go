@@ -86,8 +86,9 @@ func (sw *serviceWrapper) initialize(ctx context.Context, ctn *Container) (sc *s
 	return sc, nil
 }
 
-func (sw *serviceWrapper) close(ctx context.Context) error {
-	ctx, err := sw.mu.lock(ctx)
+func (sw *serviceWrapper) close(ctx context.Context) (err error) {
+	defer recoverPanicToError(&err)
+	ctx, err = sw.mu.lock(ctx)
 	if err != nil {
 		return err
 	}
