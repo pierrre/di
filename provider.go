@@ -2,24 +2,39 @@ package di
 
 import (
 	"context"
+	"reflect"
 	"sync/atomic"
 )
 
-// Provider creates a [Provider] for the given service type and name.
-//
-// The returned [Provider] should be closed with [Provider.Close].
+// Provider returns a [Provider] for the given service type and name.
 func (c *Container) Provider[S any](name string) *Provider[S] {
-	return &Provider[S]{
-		ctn:  c,
-		name: name,
+	key := newKey[*Provider[S]](name)
+	typ := reflect.TypeFor[*Provider[S]]()
+	sw, ok := c.services.Load(key)
+	if !ok {
+		b := func(ctx context.Context, ctn *Container) (any, Close, error) {
+			p := &Provider[S]{
+				ctn:  ctn,
+				name: name,
+			}
+			cl := func(context.Context) error {
+				p.Close()
+				return nil
+			}
+			return p, cl, nil
+		}
+		sw = newServiceWrapper(key, typ, b)
+		sw, _ = c.services.LoadOrStore(key, sw)
 	}
+	pi, _ := sw.get(context.Background(), c)
+	p, _ := pi.(*Provider[S])
+	return p
 }
 
 // Provider provides a service.
 //
 // It can be used to break circular dependencies.
 // It caches the service after the first call to [Provider.Get], so it's faster to call [Provider.Get] than [Container.Get].
-// It should be closed with [Provider.Close].
 type Provider[S any] struct {
 	ctn     *Container
 	name    string

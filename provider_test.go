@@ -13,13 +13,14 @@ func TestProvider(t *testing.T) {
 	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
 		return "test", nil, nil
 	})
-	p := ctn.Provider[string]("")
 	for range 3 {
+		p := ctn.Provider[string]("")
 		for range 5 {
 			s := p.MustGet(ctx)
 			assert.Equal(t, s, "test")
 		}
-		p.Close()
+		err := ctn.Close(ctx)
+		assert.NoError(t, err)
 	}
 }
 
@@ -64,5 +65,25 @@ func BenchmarkProviderGet(b *testing.B) {
 	p := ctn.Provider[string]("")
 	for b.Loop() {
 		_, _ = p.Get(ctx)
+	}
+}
+
+func TestContainerProviderAllocs(t *testing.T) {
+	ctn := new(Container)
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "test", nil, nil
+	})
+	assert.AllocsPerRun(t, 100, func() {
+		_ = ctn.Provider[string]("")
+	}, 0)
+}
+
+func BenchmarkContainerProvider(b *testing.B) {
+	ctn := new(Container)
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "test", nil, nil
+	})
+	for b.Loop() {
+		_ = ctn.Provider[string]("")
 	}
 }
