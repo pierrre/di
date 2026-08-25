@@ -92,11 +92,11 @@ func (sw *serviceWrapper) close(ctx context.Context) error {
 		return err
 	}
 	defer sw.mu.unlock()
+	defer sw.content.Store(nil)
 	sc := sw.content.Load()
 	if sc != nil && sc.cl != nil {
 		err = sc.cl(ctx)
 	}
-	sw.content.Store(nil)
 	return err
 }
 
