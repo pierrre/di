@@ -12,6 +12,8 @@ var (
 	ErrAlreadySet = errors.New("already set")
 	// ErrCycle is returned when a cycle is detected.
 	ErrCycle = errors.New("cycle")
+	// ErrNilBuilder is returned when the builder is nil.
+	ErrNilBuilder = errors.New("nil builder")
 )
 
 // ServiceError represents an error related to a service.

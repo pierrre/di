@@ -44,6 +44,15 @@ func TestContainerSetErrorAlreadySet(t *testing.T) {
 	assert.ErrorEqual(t, err, "service string: already set")
 }
 
+func TestContainerSetErrorNilBuilder(t *testing.T) {
+	ctn := new(Container)
+	err := ctn.Set[string]("", nil)
+	serviceErr, _ := assert.ErrorAsType[*ServiceError](t, err)
+	assert.Equal(t, serviceErr.Key, newKey[string](""))
+	assert.ErrorIs(t, err, ErrNilBuilder)
+	assert.ErrorEqual(t, err, "service string: nil builder")
+}
+
 func TestContainerMustSetPanicAlreadySet(t *testing.T) {
 	ctn := new(Container)
 	ctn.MustSet("", func(ctx context.Context, ctn *Container) (string, Close, error) {

@@ -25,6 +25,9 @@ type Container struct {
 func (c *Container) Set[S any](name string, b Builder[S]) (err error) {
 	key := newKey[S](name)
 	defer wrapReturnServiceError(&err, key)
+	if b == nil {
+		return ErrNilBuilder
+	}
 	typ := reflect.TypeFor[S]()
 	sw := newServiceWrapper(key, typ, func(ctx context.Context, ctn *Container) (any, Close, error) {
 		return b(ctx, ctn)
