@@ -9,10 +9,6 @@ import (
 // GetDependency returns a service [Dependency] tree from the [Container].
 func (c *Container) GetDependency[S any](ctx context.Context, name string) (dep *Dependency, err error) {
 	key := newKey[S](name)
-	return c.getDependency(ctx, key)
-}
-
-func (c *Container) getDependency(ctx context.Context, key Key) (d *Dependency, err error) {
 	defer wrapReturnServiceError(&err, key)
 	sw, err := c.getServiceWrapper(key)
 	if err != nil {
