@@ -3,7 +3,8 @@ package di
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"reflect"
@@ -42,9 +43,7 @@ func ExampleDependency() {
 		panic(err)
 	}
 	buf := new(bytes.Buffer)
-	enc := json.NewEncoder(buf)
-	enc.SetIndent("", "\t")
-	err = enc.Encode(dep)
+	err = json.MarshalWrite(buf, dep, jsontext.WithIndent("\t"))
 	if err != nil {
 		panic(err)
 	}
