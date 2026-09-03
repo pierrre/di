@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/pierrre/assert"
 	"github.com/pierrre/go-libs/goroutine"
@@ -153,6 +154,140 @@ func newTestContainerCycle() *Container {
 		return "", nil, nil
 	})
 	return ctn
+}
+
+func TestContainerGetErrorDeadlock(t *testing.T) {
+	ctx := t.Context()
+	ctn := new(Container)
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	ctn.MustSet("a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-release
+		_, err := ctn.Get[string](ctx, "b")
+		if err != nil {
+			return "", nil, err
+		}
+		return "", nil, nil
+	})
+	ctn.MustSet("b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-release
+		_, err := ctn.Get[string](ctx, "a")
+		if err != nil {
+			return "", nil, err
+		}
+		return "", nil, nil
+	})
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	var errs [2]error
+	waiter := goroutine.StartN(ctx, 2, func(ctx context.Context, i int) {
+		name := "a"
+		if i == 1 {
+			name = "b"
+		}
+		_, err := ctn.Get[string](ctx, name)
+		errs[i] = err
+	})
+	<-started
+	<-started
+	close(release)
+	waiter.Wait()
+	assert.ErrorIs(t, errs[0], ErrCycle)
+	assert.ErrorIs(t, errs[1], ErrCycle)
+}
+
+func TestContainerGetErrorDeadlock3(t *testing.T) {
+	ctx := t.Context()
+	ctn := new(Container)
+	started := make(chan struct{}, 3)
+	release := make(chan struct{})
+	ctn.MustSet("a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-release
+		_, err := ctn.Get[string](ctx, "b")
+		if err != nil {
+			return "", nil, err
+		}
+		return "", nil, nil
+	})
+	ctn.MustSet("b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-release
+		_, err := ctn.Get[string](ctx, "c")
+		if err != nil {
+			return "", nil, err
+		}
+		return "", nil, nil
+	})
+	ctn.MustSet("c", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		<-release
+		_, err := ctn.Get[string](ctx, "a")
+		if err != nil {
+			return "", nil, err
+		}
+		return "", nil, nil
+	})
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	var errs [3]error
+	names := []string{"a", "b", "c"}
+	waiter := goroutine.StartN(ctx, 3, func(ctx context.Context, i int) {
+		_, err := ctn.Get[string](ctx, names[i])
+		errs[i] = err
+	})
+	for range 3 {
+		<-started
+	}
+	close(release)
+	waiter.Wait()
+	for i := range 3 {
+		assert.ErrorIs(t, errs[i], ErrCycle)
+	}
+}
+
+func TestContainerGetConcurrentDependency(t *testing.T) {
+	ctx := t.Context()
+	ctn := new(Container)
+	ctn.MustSet("a", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		_, err := ctn.Get[string](ctx, "b")
+		if err != nil {
+			return "", nil, err
+		}
+		return "a", nil, nil
+	})
+	ctn.MustSet("b", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "b", nil, nil
+	})
+	var errs [2]error
+	waiter := goroutine.StartN(ctx, 2, func(ctx context.Context, i int) {
+		name := "a"
+		if i == 1 {
+			name = "b"
+		}
+		_, err := ctn.Get[string](ctx, name)
+		errs[i] = err
+	})
+	waiter.Wait()
+	assert.NoError(t, errs[0])
+	assert.NoError(t, errs[1])
 }
 
 func TestContainerGetErrorServiceWrapperMutexContextCanceled(t *testing.T) {

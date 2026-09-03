@@ -10,7 +10,7 @@ var (
 	ErrNotSet = errors.New("not set")
 	// ErrAlreadySet is returned when a service is already set.
 	ErrAlreadySet = errors.New("already set")
-	// ErrCycle is returned when a cycle is detected.
+	// ErrCycle is returned when a cycle is detected (a service depends on itself, directly or transitively, including across concurrent initializations).
 	ErrCycle = errors.New("cycle")
 	// ErrNilBuilder is returned when the builder is nil.
 	ErrNilBuilder = errors.New("nil builder")

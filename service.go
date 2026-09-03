@@ -12,7 +12,7 @@ type serviceWrapper struct {
 	key     Key
 	typ     reflect.Type
 	builder builder
-	mu      *mutex
+	mu      mutex
 	content atomic.Pointer[serviceContent]
 }
 
@@ -27,7 +27,6 @@ func newServiceWrapper(key Key, typ reflect.Type, b builder) *serviceWrapper {
 		key:     key,
 		typ:     typ,
 		builder: b,
-		mu:      newMutex(),
 	}
 }
 
