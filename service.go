@@ -78,7 +78,7 @@ func (sw *serviceWrapper) initialize(ctx context.Context, ctn *Container) (sc *s
 			Type:         sw.key.Type,
 			reflectType:  sw.typ,
 			Name:         sw.key.Name,
-			Dependencies: dc.dependencies,
+			Dependencies: dc.snapshot(),
 		},
 	}
 	sw.content.Store(sc)

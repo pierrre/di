@@ -186,6 +186,31 @@ func TestGetDependencyErrorCycle(t *testing.T) {
 	assert.ErrorEqual(t, err, "service string(a): service string(b): service string(c): service string(a): cycle")
 }
 
+func TestGetDependencyConcurrentBuilderGoroutine(t *testing.T) {
+	ctx := t.Context()
+	ctn := new(Container)
+	ctn.MustSet("helper", func(ctx context.Context, ctn *Container) (string, Close, error) {
+		return "h", nil, nil
+	})
+	done := make(chan struct{})
+	ctn.MustSet("", func(ctx context.Context, ctn *Container) (*myService, Close, error) {
+		started := make(chan struct{})
+		go func() {
+			close(started)
+			defer close(done)
+			for range 100000 {
+				_, _ = ctn.Get[string](ctx, "helper")
+			}
+		}()
+		<-started
+		return &myService{}, nil, nil
+	})
+	dep, err := ctn.GetDependency[*myService](ctx, "")
+	assert.NoError(t, err)
+	assert.NotZero(t, dep)
+	<-done
+}
+
 func TestGetDependencyErrorServiceWrapperMutexContextCanceled(t *testing.T) {
 	ctx := t.Context()
 	ctn := new(Container)

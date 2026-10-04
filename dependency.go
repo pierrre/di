@@ -3,6 +3,7 @@ package di
 import (
 	"context"
 	"reflect"
+	"slices"
 	"sync"
 )
 
@@ -39,6 +40,13 @@ func (dc *dependencyCollector) add(d *Dependency) {
 	dc.mu.Lock()
 	defer dc.mu.Unlock()
 	dc.dependencies = append(dc.dependencies, d)
+}
+
+// snapshot returns a copy of the collected dependencies.
+func (dc *dependencyCollector) snapshot() []*Dependency {
+	dc.mu.Lock()
+	defer dc.mu.Unlock()
+	return slices.Clone(dc.dependencies)
 }
 
 type dependencyCollectorContextKey struct{}
